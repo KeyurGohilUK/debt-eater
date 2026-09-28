@@ -1,8 +1,9 @@
 export type DebtScope = "personal" | "business";
+export type Currency = "GBP" | "INR";
 
 export interface DirectRepayment {
   id: string;
-  amountPence: number;
+  amountMinor: number;
   date: string;
 }
 
@@ -10,42 +11,54 @@ export interface Loan {
   id: string;
   name: string;
   scope: DebtScope;
-  originalBalancePence: number;
-  currentBalancePence: number;
+  currency: Currency;
+  archived: boolean;
+  originalBalanceMinor: number;
+  currentBalanceMinor: number;
   annualInterestRateBps: number;
-  monthlyPaymentPence: number;
+  monthlyPaymentMinor: number;
   directRepayments: DirectRepayment[];
 }
 
 export interface LoanProjection {
-  adjustedBalancePence: number;
+  adjustedBalanceMinor: number;
   monthsRemaining: number | null;
-  totalInterestPence: number | null;
+  totalInterestMinor: number | null;
   payoffDate: Date | null;
   progressPercent: number;
 }
 
-export const poundsToPence = (value: number): number => Math.round(value * 100);
-export const penceToPounds = (value: number): number => value / 100;
+export const toMinorUnits = (value: number): number => Math.round(value * 100);
+export const fromMinorUnits = (value: number): number => value / 100;
 
-export function remainingBalancePence(loan: Loan): number {
+export function formatMoney(value: number, currency: Currency): string {
+  const locale = currency === "INR" ? "en-IN" : "en-GB";
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(fromMinorUnits(value));
+}
+
+export function remainingBalanceMinor(loan: Loan): number {
   const direct = loan.directRepayments.reduce(
-    (sum, item) => sum + item.amountPence,
+    (sum, item) => sum + item.amountMinor,
     0,
   );
-  return Math.max(0, loan.currentBalancePence - direct);
+  return Math.max(0, loan.currentBalanceMinor - direct);
 }
 
 export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
-  const balance = remainingBalancePence(loan);
+  const balance = remainingBalanceMinor(loan);
   const progress =
-    loan.originalBalancePence > 0
+    loan.originalBalanceMinor > 0
       ? Math.min(
           100,
           Math.max(
             0,
-            ((loan.originalBalancePence - balance) /
-              loan.originalBalancePence) *
+            ((loan.originalBalanceMinor - balance) /
+              loan.originalBalanceMinor) *
               100,
           ),
         )
@@ -53,23 +66,23 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
 
   if (balance === 0) {
     return {
-      adjustedBalancePence: 0,
+      adjustedBalanceMinor: 0,
       monthsRemaining: 0,
-      totalInterestPence: 0,
+      totalInterestMinor: 0,
       payoffDate: from,
       progressPercent: 100,
     };
   }
 
   const monthlyRate = loan.annualInterestRateBps / 10_000 / 12;
-  const payment = loan.monthlyPaymentPence;
+  const payment = loan.monthlyPaymentMinor;
   const firstInterest = Math.round(balance * monthlyRate);
 
   if (payment <= firstInterest || payment <= 0) {
     return {
-      adjustedBalancePence: balance,
+      adjustedBalanceMinor: balance,
       monthsRemaining: null,
-      totalInterestPence: null,
+      totalInterestMinor: null,
       payoffDate: null,
       progressPercent: progress,
     };
@@ -89,9 +102,9 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
 
   if (outstanding > 0) {
     return {
-      adjustedBalancePence: balance,
+      adjustedBalanceMinor: balance,
       monthsRemaining: null,
-      totalInterestPence: null,
+      totalInterestMinor: null,
       payoffDate: null,
       progressPercent: progress,
     };
@@ -100,9 +113,9 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
   const payoffDate = new Date(from);
   payoffDate.setMonth(payoffDate.getMonth() + months);
   return {
-    adjustedBalancePence: balance,
+    adjustedBalanceMinor: balance,
     monthsRemaining: months,
-    totalInterestPence: interestTotal,
+    totalInterestMinor: interestTotal,
     payoffDate,
     progressPercent: progress,
   };
