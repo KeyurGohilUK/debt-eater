@@ -28,7 +28,7 @@ function render() {
     0,
   );
   app!.innerHTML = `
-    <header class="topbar"><div><span class="mark">DE</span><strong>Debt Eater</strong></div><button class="primary" id="add-loan">+ Add loan</button></header>
+    <header class="topbar"><div><img class="brand-icon" src="./debt-eater-icon.png" alt="" /><strong>Debt Eater</strong></div><button class="primary" id="add-loan">+ Add loan</button></header>
     <section class="hero">
       <p class="eyebrow">TOTAL DEBT</p><h1>${fmt(total)}</h1>
       <div class="scope"><span>${loans.length} active loan${loans.length === 1 ? "" : "s"}</span><span>Stored on this device</span></div>
