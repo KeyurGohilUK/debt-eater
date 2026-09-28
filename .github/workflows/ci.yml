@@ -2,7 +2,6 @@ name: CI and Pages
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
   push:
     branches: [main]
   workflow_dispatch:
@@ -14,7 +13,7 @@ permissions:
 
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   quality:
@@ -33,8 +32,7 @@ jobs:
   deploy:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     needs: quality
     environment:
       name: github-pages
