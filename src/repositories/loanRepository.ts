@@ -1,6 +1,6 @@
-import type { Loan } from '../domain/loan';
+import type { Loan } from "../domain/loan";
 
-const STORAGE_KEY = 'debt-eater.loans.v1';
+const STORAGE_KEY = "debt-eater.loans.v1";
 
 export interface LoanRepository {
   list(): Loan[];
