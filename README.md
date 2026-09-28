@@ -1,2 +1,2 @@
 # debt-eater
-Personal finanace calculator
+Personal finanace 
