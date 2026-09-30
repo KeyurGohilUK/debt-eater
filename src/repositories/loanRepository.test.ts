@@ -43,8 +43,8 @@ describe("local loan repository", () => {
       originalBalanceMinor: 34567890,
       currentBalanceMinor: 34067890,
       monthlyPaymentMinor: 150000,
+      nextPaymentDate: expect.any(String),
       monthlyOverpaymentMinor: 0,
-      payments: [],
       directRepayments: [
         { id: "repay-1", amountMinor: 500000, date: "2026-09-01" },
       ],
@@ -53,7 +53,7 @@ describe("local loan repository", () => {
     expect(repository.list()).toEqual([loan]);
   });
 
-  it("defaults new payment fields when loading older current-format loans", () => {
+  it("defaults planned overpayment when loading older current-format loans", () => {
     const storage = memoryStorage({
       "debt-eater.loans.v2": JSON.stringify([
         {
@@ -74,7 +74,42 @@ describe("local loan repository", () => {
     const loan = createLocalLoanRepository(storage).list()[0]!;
 
     expect(loan.monthlyOverpaymentMinor).toBe(0);
-    expect(loan.payments).toEqual([]);
+    expect(loan.nextPaymentDate).toBeTruthy();
+  });
+
+  it("folds legacy logged principal into the saved balance and drops routine logs", () => {
+    const storage = memoryStorage({
+      "debt-eater.loans.v2": JSON.stringify([
+        {
+          id: "loan-with-logs",
+          name: "Older mortgage",
+          scope: "personal",
+          currency: "GBP",
+          archived: false,
+          originalBalanceMinor: 100_000,
+          currentBalanceMinor: 90_000,
+          annualInterestRateBps: 450,
+          monthlyPaymentMinor: 1_000,
+          directRepayments: [],
+          payments: [
+            {
+              id: "old-payment",
+              date: "2026-09-01",
+              amountMinor: 1_200,
+              interestMinor: 300,
+              overpaymentMinor: 200,
+            },
+          ],
+        },
+      ]),
+    });
+
+    const [loan] = createLocalLoanRepository(storage).list();
+
+    expect(loan!.currentBalanceMinor).toBe(89_100);
+    expect(
+      JSON.parse(storage.getItem("debt-eater.loans.v2")!)[0],
+    ).not.toHaveProperty("payments");
   });
 
   it("prefers the current storage format when both formats exist", () => {
@@ -89,8 +124,8 @@ describe("local loan repository", () => {
         currentBalanceMinor: 100000,
         annualInterestRateBps: 800,
         monthlyPaymentMinor: 10000,
+        nextPaymentDate: "2026-10-01",
         monthlyOverpaymentMinor: 0,
-        payments: [],
         directRepayments: [],
       },
     ];

@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   Loan,
   formatMoney,
-  isValidPaymentRecord,
-  paymentPrincipalMinor,
   projectLoan,
   summarizeDebts,
   remainingBalanceMinor,
@@ -20,9 +18,9 @@ const loan = (overrides: Partial<Loan> = {}): Loan => ({
   currentBalanceMinor: toMinorUnits(350_000),
   annualInterestRateBps: 490,
   monthlyPaymentMinor: toMinorUnits(1_780),
+  nextPaymentDate: "2026-10-01",
   monthlyOverpaymentMinor: 0,
   directRepayments: [],
-  payments: [],
   ...overrides,
 });
 
@@ -149,7 +147,7 @@ describe("debt dashboard summary", () => {
   });
 });
 
-describe("monthly overpayments and payment history", () => {
+describe("planned monthly overpayments", () => {
   it("includes planned monthly overpayments in payoff projections", () => {
     const from = new Date("2026-09-01T00:00:00Z");
     const regular = projectLoan(loan(), from);
@@ -163,26 +161,19 @@ describe("monthly overpayments and payment history", () => {
     );
   });
 
-  it("reduces balances by recorded principal and validates payment breakdowns", () => {
-    const payment = {
-      id: "payment-1",
-      date: "2026-09-01",
-      amountMinor: toMinorUnits(1_200),
-      interestMinor: toMinorUnits(300),
-      overpaymentMinor: toMinorUnits(200),
-    };
-
-    expect(isValidPaymentRecord(payment)).toBe(true);
-    expect(paymentPrincipalMinor(payment)).toBe(toMinorUnits(900));
-    expect(remainingBalanceMinor(loan({ payments: [payment] }))).toBe(
-      toMinorUnits(349_100),
-    );
-    expect(
-      isValidPaymentRecord({
-        ...payment,
-        overpaymentMinor: toMinorUnits(1_000),
+  it("anchors the payoff date to the next scheduled debit", () => {
+    const result = projectLoan(
+      loan({
+        currentBalanceMinor: toMinorUnits(2_000),
+        originalBalanceMinor: toMinorUnits(2_000),
+        annualInterestRateBps: 0,
+        monthlyPaymentMinor: toMinorUnits(1_000),
+        nextPaymentDate: "2026-10-15",
       }),
-    ).toBe(false);
+      new Date("2026-09-30T00:00:00Z"),
+    );
+    expect(result.monthsRemaining).toBe(2);
+    expect(result.payoffDate?.toISOString().slice(0, 10)).toBe("2026-11-15");
   });
 
   it("reports planned overpayments separately in each currency summary", () => {
