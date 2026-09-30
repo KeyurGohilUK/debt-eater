@@ -28,6 +28,19 @@ export interface LoanProjection {
   totalInterestMinor: number | null;
   payoffDate: Date | null;
   progressPercent: number;
+  balanceTrajectoryMinor?: number[];
+}
+
+export interface LoanSimulation {
+  baseline: LoanProjection;
+  scenario: LoanProjection;
+  monthsSaved: number | null;
+  interestSavedMinor: number | null;
+}
+
+export interface LoanSimulationInput {
+  additionalMonthlyPaymentMinor: number;
+  lumpSumMinor: number;
 }
 
 export const toMinorUnits = (value: number): number => Math.round(value * 100);
@@ -55,8 +68,21 @@ export function remainingBalanceMinor(loan: Loan): number {
   return Math.max(0, loan.currentBalanceMinor - direct);
 }
 
-export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
-  const balance = remainingBalanceMinor(loan);
+export function projectLoan(
+  loan: Loan,
+  from = new Date(),
+  options: Partial<LoanSimulationInput> & { includeTrajectory?: boolean } = {},
+): LoanProjection {
+  const lumpSumMinor = validSimulationAmount(options.lumpSumMinor);
+  const additionalMonthlyPaymentMinor = validSimulationAmount(
+    options.additionalMonthlyPaymentMinor,
+  );
+  const balance = Math.max(0, remainingBalanceMinor(loan) - lumpSumMinor);
+  const trajectory = options.includeTrajectory ? [balance] : undefined;
+  const result = (
+    values: Omit<LoanProjection, "balanceTrajectoryMinor">,
+  ): LoanProjection =>
+    trajectory ? { ...values, balanceTrajectoryMinor: trajectory } : values;
   const progress =
     loan.originalBalanceMinor > 0
       ? Math.min(
@@ -71,27 +97,28 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
       : 100;
 
   if (balance === 0) {
-    return {
+    return result({
       adjustedBalanceMinor: 0,
       monthsRemaining: 0,
       totalInterestMinor: 0,
       payoffDate: from,
       progressPercent: 100,
-    };
+    });
   }
 
   const monthlyRate = loan.annualInterestRateBps / 10_000 / 12;
-  const payment = monthlyPaymentTotalMinor(loan);
+  const payment =
+    monthlyPaymentTotalMinor(loan) + additionalMonthlyPaymentMinor;
   const firstInterest = Math.round(balance * monthlyRate);
 
   if (payment <= firstInterest || payment <= 0) {
-    return {
+    return result({
       adjustedBalanceMinor: balance,
       monthsRemaining: null,
       totalInterestMinor: null,
       payoffDate: null,
       progressPercent: progress,
-    };
+    });
   }
 
   let outstanding = balance;
@@ -103,17 +130,18 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
     const interest = Math.round(outstanding * monthlyRate);
     interestTotal += interest;
     outstanding = Math.max(0, outstanding + interest - payment);
+    trajectory?.push(outstanding);
     months += 1;
   }
 
   if (outstanding > 0) {
-    return {
+    return result({
       adjustedBalanceMinor: balance,
       monthsRemaining: null,
       totalInterestMinor: null,
       payoffDate: null,
       progressPercent: progress,
-    };
+    });
   }
 
   const scheduledDate = new Date(`${loan.nextPaymentDate}T12:00:00`);
@@ -121,13 +149,50 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
     ? new Date(from)
     : scheduledDate;
   payoffDate.setMonth(payoffDate.getMonth() + months - 1);
-  return {
+  return result({
     adjustedBalanceMinor: balance,
     monthsRemaining: months,
     totalInterestMinor: interestTotal,
     payoffDate,
     progressPercent: progress,
+  });
+}
+
+export function simulateLoan(
+  loan: Loan,
+  input: LoanSimulationInput,
+  from = new Date(),
+): LoanSimulation {
+  const baseline = projectLoan(loan, from, { includeTrajectory: true });
+  const scenario = projectLoan(loan, from, {
+    ...input,
+    includeTrajectory: true,
+  });
+
+  return {
+    baseline,
+    scenario,
+    monthsSaved:
+      baseline.monthsRemaining === null || scenario.monthsRemaining === null
+        ? null
+        : Math.max(0, baseline.monthsRemaining - scenario.monthsRemaining),
+    interestSavedMinor:
+      baseline.totalInterestMinor === null ||
+      scenario.totalInterestMinor === null
+        ? null
+        : Math.max(
+            0,
+            baseline.totalInterestMinor - scenario.totalInterestMinor,
+          ),
   };
+}
+
+function validSimulationAmount(amount: number | undefined): number {
+  return typeof amount === "number" &&
+    Number.isSafeInteger(amount) &&
+    amount > 0
+    ? amount
+    : 0;
 }
 
 export interface CurrencyDebtSummary {

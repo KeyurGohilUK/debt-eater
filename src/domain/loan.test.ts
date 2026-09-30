@@ -3,6 +3,7 @@ import {
   Loan,
   formatMoney,
   projectLoan,
+  simulateLoan,
   summarizeDebts,
   remainingBalanceMinor,
   toMinorUnits,
@@ -190,5 +191,56 @@ describe("planned monthly overpayments", () => {
     expect(
       summary.map(({ monthlyOverpaymentMinor }) => monthlyOverpaymentMinor),
     ).toEqual([toMinorUnits(200), toMinorUnits(500)]);
+  });
+});
+
+describe("repayment simulator", () => {
+  it("shows monthly and lump-sum savings without changing saved loan inputs", () => {
+    const savedLoan = loan();
+    const before = structuredClone(savedLoan);
+    const result = simulateLoan(
+      savedLoan,
+      {
+        additionalMonthlyPaymentMinor: toMinorUnits(300),
+        lumpSumMinor: toMinorUnits(5_000),
+      },
+      new Date("2026-09-01T00:00:00Z"),
+    );
+
+    expect(result.scenario.monthsRemaining!).toBeLessThan(
+      result.baseline.monthsRemaining!,
+    );
+    expect(result.interestSavedMinor!).toBeGreaterThan(0);
+    expect(result.monthsSaved!).toBeGreaterThan(0);
+    expect(result.baseline.balanceTrajectoryMinor?.[0]).toBe(
+      toMinorUnits(350_000),
+    );
+    expect(result.scenario.balanceTrajectoryMinor?.[0]).toBe(
+      toMinorUnits(345_000),
+    );
+    expect(savedLoan).toEqual(before);
+  });
+
+  it("marks a lump-sum scenario as cleared when it covers the remaining balance", () => {
+    const result = simulateLoan(loan(), {
+      additionalMonthlyPaymentMinor: 0,
+      lumpSumMinor: toMinorUnits(400_000),
+    });
+
+    expect(result.scenario.monthsRemaining).toBe(0);
+    expect(result.scenario.totalInterestMinor).toBe(0);
+    expect(result.monthsSaved).toBe(result.baseline.monthsRemaining);
+  });
+
+  it("keeps savings unknown when the saved payment cannot repay the loan", () => {
+    const result = simulateLoan(
+      loan({ monthlyPaymentMinor: toMinorUnits(100) }),
+      { additionalMonthlyPaymentMinor: toMinorUnits(50), lumpSumMinor: 0 },
+    );
+
+    expect(result.baseline.monthsRemaining).toBeNull();
+    expect(result.scenario.monthsRemaining).toBeNull();
+    expect(result.monthsSaved).toBeNull();
+    expect(result.interestSavedMinor).toBeNull();
   });
 });

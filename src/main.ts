@@ -3,6 +3,7 @@ import {
   Loan,
   formatMoney,
   projectLoan,
+  simulateLoan,
   summarizeDebts,
   toMinorUnits,
 } from "./domain/loan";
@@ -43,6 +44,7 @@ function render() {
     </section>
     <dialog id="loan-dialog">${loanForm()}</dialog>
     <dialog id="repayment-dialog"><form method="dialog" id="repayment-form"><input type="hidden" name="loanId"><div class="dialog-head"><div><p class="eyebrow">DIRECT TO PRINCIPAL</p><h2>Add repayment</h2></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div><label>Amount to principal <span id="repayment-currency"></span><input name="amount" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><label>Date<input name="date" type="date" required></label><button class="primary full" value="default">Apply repayment</button></form></dialog>
+    <dialog id="simulator-dialog" aria-labelledby="simulator-title"><section class="simulator-shell"><div class="dialog-head"><div><p class="eyebrow">WHAT IF?</p><h2 id="simulator-title">Repayment simulator</h2><p class="simulator-debt" id="simulator-debt"></p></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div><form id="simulator-form"><input type="hidden" name="loanId"><label>Extra each month <span id="simulator-currency"></span><input name="monthlyExtra" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label><label>One-off repayment now <span id="simulator-lump-currency"></span><input name="lumpSum" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label><p class="simulator-note">Uses your saved balance, interest rate and direct-debit schedule. Scenario changes are not saved.</p></form><div id="simulator-results" aria-live="polite"></div></section></dialog>
   `;
   bind();
 }
@@ -92,7 +94,7 @@ function loanCard(loan: Loan, isArchived = false): string {
     <div class="progress" role="progressbar" aria-label="${escapeHtml(loan.name)} repaid" aria-valuenow="${p.progressPercent.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p.progressPercent}%"></i></div>
     <div class="progress-label"><span>${p.progressPercent.toFixed(1)}% repaid</span><span>of ${formatMoney(loan.originalBalanceMinor, loan.currency)}</span></div>
     <div class="metrics"><div><span>Required monthly</span><strong>${formatMoney(loan.monthlyPaymentMinor, loan.currency)}</strong></div><div><span>Planned monthly extra</span><strong>${formatMoney(loan.monthlyOverpaymentMinor, loan.currency)}</strong></div><div><span>Tenure</span><strong>${tenure(p.monthsRemaining)}</strong></div><div><span>Payoff</span><strong>${payoff}</strong></div><div><span>Future interest</span><strong>${p.totalInterestMinor === null ? "—" : formatMoney(p.totalInterestMinor, loan.currency)}</strong></div></div>
-    ${paymentHistory(loan)}<div class="card-actions">${isArchived ? `<button class="secondary full restore" data-id="${loan.id}">Restore debt</button>` : `<button class="secondary edit" data-id="${loan.id}">Edit</button><button class="secondary archive" data-id="${loan.id}">Archive</button><button class="secondary full repayment" data-id="${loan.id}">+ Direct repayment</button>`}</div>
+    ${paymentHistory(loan)}<div class="card-actions">${isArchived ? `<button class="secondary full restore" data-id="${loan.id}">Restore debt</button>` : `<button class="secondary edit" data-id="${loan.id}">Edit</button><button class="secondary archive" data-id="${loan.id}">Archive</button><button class="secondary full simulate" data-id="${loan.id}">Simulate repayments</button><button class="secondary full repayment" data-id="${loan.id}">+ Direct repayment</button>`}</div>
   </article>`;
 }
 
@@ -145,6 +147,8 @@ function bind() {
   const loanDialog = document.querySelector<HTMLDialogElement>("#loan-dialog")!;
   const repaymentDialog =
     document.querySelector<HTMLDialogElement>("#repayment-dialog")!;
+  const simulatorDialog =
+    document.querySelector<HTMLDialogElement>("#simulator-dialog")!;
   document
     .querySelectorAll<HTMLButtonElement>(".dialog-close")
     .forEach((button) =>
@@ -291,6 +295,34 @@ function bind() {
         openRepaymentDialog(button.dataset.id!),
       ),
     );
+  document.querySelectorAll<HTMLButtonElement>(".simulate").forEach((button) =>
+    button.addEventListener("click", () => {
+      const loan = loans.find(({ id }) => id === button.dataset.id)!;
+      const form = document.querySelector<HTMLFormElement>("#simulator-form")!;
+      form.reset();
+      (form.elements.namedItem("loanId") as HTMLInputElement).value = loan.id;
+      document.querySelector<HTMLElement>("#simulator-debt")!.textContent =
+        loan.name;
+      document.querySelector<HTMLElement>("#simulator-currency")!.textContent =
+        `(${loan.currency})`;
+      document.querySelector<HTMLElement>(
+        "#simulator-lump-currency",
+      )!.textContent = `(${loan.currency})`;
+      simulatorDialog.showModal();
+      updateSimulator(loan);
+    }),
+  );
+  document
+    .querySelector<HTMLFormElement>("#simulator-form")
+    ?.addEventListener("input", () => {
+      const loanId = (
+        document
+          .querySelector<HTMLFormElement>("#simulator-form")!
+          .elements.namedItem("loanId") as HTMLInputElement
+      ).value;
+      const loan = loans.find(({ id }) => id === loanId);
+      if (loan) updateSimulator(loan);
+    });
   document
     .querySelector<HTMLFormElement>("#repayment-form")
     ?.addEventListener("submit", (event) => {
@@ -315,6 +347,55 @@ function bind() {
       repaymentDialog.close();
       render();
     });
+}
+
+function updateSimulator(loan: Loan) {
+  const form = document.querySelector<HTMLFormElement>("#simulator-form")!;
+  const formData = new FormData(form);
+  const simulation = simulateLoan(loan, {
+    additionalMonthlyPaymentMinor: toMinorUnits(
+      Number(formData.get("monthlyExtra")),
+    ),
+    lumpSumMinor: toMinorUnits(Number(formData.get("lumpSum"))),
+  });
+  const { baseline, scenario } = simulation;
+  const moneySaved = (amount: number | null) =>
+    amount === null ? "—" : formatMoney(amount, loan.currency);
+  const projectedDate = (date: Date | null) =>
+    date
+      ? date.toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+      : "Not predictable";
+  const baselineValues = baseline.balanceTrajectoryMinor ?? [];
+  const scenarioValues = scenario.balanceTrajectoryMinor ?? [];
+  const maxLength = Math.max(baselineValues.length, scenarioValues.length);
+  const maxBalance = Math.max(1, ...baselineValues, ...scenarioValues);
+  const chartLine = (values: number[]) =>
+    values
+      .map((value, index) => {
+        const x = 12 + (index / Math.max(1, maxLength - 1)) * 296;
+        const y = 12 + (1 - value / maxBalance) * 126;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  const baselineMonthText =
+    baseline.monthsRemaining === null
+      ? "Unknown"
+      : tenure(baseline.monthsRemaining);
+  const scenarioMonthText =
+    scenario.monthsRemaining === null
+      ? "Unknown"
+      : tenure(scenario.monthsRemaining);
+
+  document.querySelector<HTMLElement>("#simulator-results")!.innerHTML = `
+    <div class="simulator-savings">
+      <article><span>Time saved</span><strong>${simulation.monthsSaved === null ? "—" : tenure(simulation.monthsSaved)}</strong></article>
+      <article><span>Interest saved</span><strong>${moneySaved(simulation.interestSavedMinor)}</strong></article>
+    </div>
+    <div class="simulator-comparison">
+      <article><p>Current plan</p><strong>${baselineMonthText}</strong><span>Payoff ${projectedDate(baseline.payoffDate)} · Interest ${moneySaved(baseline.totalInterestMinor)}</span></article>
+      <article><p>With scenario</p><strong>${scenarioMonthText}</strong><span>Payoff ${projectedDate(scenario.payoffDate)} · Interest ${moneySaved(scenario.totalInterestMinor)}</span></article>
+    </div>
+    <div class="simulator-chart-wrap"><p>Estimated balance over time</p><svg class="simulator-chart" viewBox="0 0 320 150" role="img" aria-label="Estimated balance projection for ${escapeHtml(loan.name)}"><line x1="12" y1="138" x2="308" y2="138"></line><polyline class="baseline-line" points="${chartLine(baselineValues)}"></polyline><polyline class="scenario-line" points="${chartLine(scenarioValues)}"></polyline></svg><div class="chart-legend"><span><i class="baseline-key"></i>Current plan</span><span><i class="scenario-key"></i>Scenario</span></div></div>`;
 }
 
 function updateLoan(id: string, changes: Partial<Loan>) {
