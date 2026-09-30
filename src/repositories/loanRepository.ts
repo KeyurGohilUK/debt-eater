@@ -12,12 +12,18 @@ interface LegacyDirectRepayment extends Omit<DirectRepayment, "amountMinor"> {
   amountPence: number;
 }
 
+interface StoredPayment {
+  amountMinor: number;
+  interestMinor: number;
+}
+
 interface StoredLoan extends Omit<
   Loan,
   "monthlyOverpaymentMinor" | "nextPaymentDate"
 > {
   monthlyOverpaymentMinor?: number;
   nextPaymentDate?: string;
+  payments?: StoredPayment[];
 }
 
 interface LegacyLoan extends Omit<
@@ -44,19 +50,40 @@ export function createLocalLoanRepository(storage: Storage): LoanRepository {
         const current = storage.getItem(STORAGE_KEY);
         if (current) {
           const normalized = (JSON.parse(current) as StoredLoan[]).map(
-            (loan): Loan => ({
-              ...loan,
-              monthlyOverpaymentMinor:
-                Number.isSafeInteger(loan.monthlyOverpaymentMinor) &&
-                (loan.monthlyOverpaymentMinor ?? 0) >= 0
-                  ? (loan.monthlyOverpaymentMinor ?? 0)
-                  : 0,
-              nextPaymentDate:
-                typeof loan.nextPaymentDate === "string" &&
-                !Number.isNaN(Date.parse(loan.nextPaymentDate))
-                  ? loan.nextPaymentDate
-                  : new Date().toISOString().slice(0, 10),
-            }),
+            (stored): Loan => {
+              const { payments, ...loan } = stored;
+              const recordedPrincipal = Array.isArray(payments)
+                ? payments.reduce((sum, payment) => {
+                    if (
+                      !Number.isSafeInteger(payment.amountMinor) ||
+                      !Number.isSafeInteger(payment.interestMinor) ||
+                      payment.amountMinor <= 0 ||
+                      payment.interestMinor < 0 ||
+                      payment.interestMinor > payment.amountMinor
+                    ) {
+                      return sum;
+                    }
+                    return sum + payment.amountMinor - payment.interestMinor;
+                  }, 0)
+                : 0;
+              return {
+                ...loan,
+                currentBalanceMinor: Math.max(
+                  0,
+                  loan.currentBalanceMinor - recordedPrincipal,
+                ),
+                monthlyOverpaymentMinor:
+                  Number.isSafeInteger(loan.monthlyOverpaymentMinor) &&
+                  (loan.monthlyOverpaymentMinor ?? 0) >= 0
+                    ? (loan.monthlyOverpaymentMinor ?? 0)
+                    : 0,
+                nextPaymentDate:
+                  typeof loan.nextPaymentDate === "string" &&
+                  !Number.isNaN(Date.parse(loan.nextPaymentDate))
+                    ? loan.nextPaymentDate
+                    : new Date().toISOString().slice(0, 10),
+              };
+            },
           );
           storage.setItem(STORAGE_KEY, JSON.stringify(normalized));
           return normalized;

@@ -77,6 +77,41 @@ describe("local loan repository", () => {
     expect(loan.nextPaymentDate).toBeTruthy();
   });
 
+  it("folds legacy logged principal into the saved balance and drops routine logs", () => {
+    const storage = memoryStorage({
+      "debt-eater.loans.v2": JSON.stringify([
+        {
+          id: "loan-with-logs",
+          name: "Older mortgage",
+          scope: "personal",
+          currency: "GBP",
+          archived: false,
+          originalBalanceMinor: 100_000,
+          currentBalanceMinor: 90_000,
+          annualInterestRateBps: 450,
+          monthlyPaymentMinor: 1_000,
+          directRepayments: [],
+          payments: [
+            {
+              id: "old-payment",
+              date: "2026-09-01",
+              amountMinor: 1_200,
+              interestMinor: 300,
+              overpaymentMinor: 200,
+            },
+          ],
+        },
+      ]),
+    });
+
+    const [loan] = createLocalLoanRepository(storage).list();
+
+    expect(loan!.currentBalanceMinor).toBe(89_100);
+    expect(
+      JSON.parse(storage.getItem("debt-eater.loans.v2")!)[0],
+    ).not.toHaveProperty("payments");
+  });
+
   it("prefers the current storage format when both formats exist", () => {
     const current = [
       {
