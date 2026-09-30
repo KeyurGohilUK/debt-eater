@@ -120,3 +120,104 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
     progressPercent: progress,
   };
 }
+
+
+export interface CurrencyDebtSummary {
+  currency: Currency;
+  debtCount: number;
+  debtMinor: number;
+  originalDebtMinor: number;
+  personalDebtMinor: number;
+  businessDebtMinor: number;
+  monthlyPaymentMinor: number;
+  personalMonthlyPaymentMinor: number;
+  businessMonthlyPaymentMinor: number;
+  progressPercent: number;
+  projectedPayoffDate: Date | null;
+}
+
+export function summarizeDebts(
+  loans: readonly Loan[],
+  from = new Date(),
+): CurrencyDebtSummary[] {
+  const active = loans.filter((loan) => !loan.archived);
+  return (["GBP", "INR"] as const)
+    .map((currency) => {
+      const currencyLoans = active.filter((loan) => loan.currency === currency);
+      if (currencyLoans.length === 0) return null;
+
+      const projected = currencyLoans.map((loan) => ({
+        loan,
+        projection: projectLoan(loan, from),
+      }));
+      const debtMinor = projected.reduce(
+        (sum, item) => sum + item.projection.adjustedBalanceMinor,
+        0,
+      );
+      const originalDebtMinor = projected.reduce(
+        (sum, item) => sum + item.loan.originalBalanceMinor,
+        0,
+      );
+      const personalDebtMinor = projected
+        .filter(({ loan }) => loan.scope === "personal")
+        .reduce((sum, item) => sum + item.projection.adjustedBalanceMinor, 0);
+      const businessDebtMinor = projected
+        .filter(({ loan }) => loan.scope === "business")
+        .reduce((sum, item) => sum + item.projection.adjustedBalanceMinor, 0);
+      const monthlyPaymentMinor = projected.reduce(
+        (sum, item) =>
+          sum +
+          (item.projection.adjustedBalanceMinor > 0
+            ? item.loan.monthlyPaymentMinor
+            : 0),
+        0,
+      );
+      const personalMonthlyPaymentMinor = projected
+        .filter(
+          ({ loan, projection }) =>
+            loan.scope === "personal" && projection.adjustedBalanceMinor > 0,
+        )
+        .reduce((sum, item) => sum + item.loan.monthlyPaymentMinor, 0);
+      const businessMonthlyPaymentMinor = projected
+        .filter(
+          ({ loan, projection }) =>
+            loan.scope === "business" && projection.adjustedBalanceMinor > 0,
+        )
+        .reduce((sum, item) => sum + item.loan.monthlyPaymentMinor, 0);
+      const progressPercent =
+        originalDebtMinor > 0
+          ? Math.min(
+              100,
+              Math.max(0, ((originalDebtMinor - debtMinor) / originalDebtMinor) * 100),
+            )
+          : 100;
+      const outstanding = projected.filter(
+        ({ projection }) => projection.adjustedBalanceMinor > 0,
+      );
+      const projectedPayoffDate =
+        outstanding.length === 0
+          ? new Date(from)
+          : outstanding.some(({ projection }) => projection.payoffDate === null)
+            ? null
+            : new Date(
+                Math.max(
+                  ...outstanding.map(({ projection }) => projection.payoffDate!.getTime()),
+                ),
+              );
+
+      return {
+        currency,
+        debtCount: currencyLoans.length,
+        debtMinor,
+        originalDebtMinor,
+        personalDebtMinor,
+        businessDebtMinor,
+        monthlyPaymentMinor,
+        personalMonthlyPaymentMinor,
+        businessMonthlyPaymentMinor,
+        progressPercent,
+        projectedPayoffDate,
+      };
+    })
+    .filter((summary): summary is CurrencyDebtSummary => summary !== null);
+}

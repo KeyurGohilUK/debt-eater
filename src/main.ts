@@ -1,9 +1,9 @@
 import "./styles.css";
 import {
-  Currency,
   Loan,
   formatMoney,
   projectLoan,
+  summarizeDebts,
   toMinorUnits,
 } from "./domain/loan";
 import { localLoanRepository } from "./repositories/loanRepository";
@@ -27,24 +27,16 @@ function tenure(months: number | null): string {
 function render() {
   const active = activeLoans();
   const archived = archivedLoans();
-  const totals = (["GBP", "INR"] as Currency[])
-    .map((currency) => ({
-      currency,
-      amount: active
-        .filter((loan) => loan.currency === currency)
-        .reduce((sum, loan) => sum + projectLoan(loan).adjustedBalanceMinor, 0),
-    }))
-    .filter(({ currency }) =>
-      active.some((loan) => loan.currency === currency),
-    );
+  const summaries = summarizeDebts(active);
 
   app!.innerHTML = `
     <header class="topbar"><div><img class="brand-icon" src="./debt-eater-icon.png" alt="" /><strong>Debt Eater</strong></div><button class="primary" id="add-loan">+ Add debt</button></header>
     <section class="hero">
       <p class="eyebrow">ACTIVE DEBT</p>
-      <div class="total-list">${totals.length ? totals.map(({ currency, amount }) => `<div class="total-item"><span>${currency === "GBP" ? "British pounds" : "Indian rupees"}</span><h1>${formatMoney(amount, currency)}</h1></div>`).join("") : `<h1>${formatMoney(0, "GBP")}</h1>`}</div>
+      <div class="total-list">${summaries.length ? summaries.map(({ currency, debtMinor }) => `<div class="total-item"><span>${currency === "GBP" ? "British pounds" : "Indian rupees"}</span><h1>${formatMoney(debtMinor, currency)}</h1></div>`).join("") : `<h1>${formatMoney(0, "GBP")}</h1>`}</div>
       <div class="scope"><span>${active.length} active debt${active.length === 1 ? "" : "s"}</span><span>Stored on this device</span></div>
     </section>
+    ${active.length ? dashboardOverview(summaries) : ""}
     <section class="content">
       ${active.length ? `<div class="loan-grid">${active.map((loan) => loanCard(loan)).join("")}</div>` : emptyState()}
       ${archived.length ? `<details class="archived-section"><summary>Archived debts (${archived.length})</summary><div class="loan-grid">${archived.map((loan) => loanCard(loan, true)).join("")}</div></details>` : ""}
@@ -53,6 +45,32 @@ function render() {
     <dialog id="repayment-dialog"><form method="dialog" id="repayment-form"><input type="hidden" name="loanId"><div class="dialog-head"><div><p class="eyebrow">DIRECT TO PRINCIPAL</p><h2>Add repayment</h2></div><button class="icon" value="cancel" aria-label="Close">×</button></div><label>Amount <span id="repayment-currency"></span><input name="amount" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><label>Date<input name="date" type="date" required></label><button class="primary full" value="default">Apply repayment</button></form></dialog>
   `;
   bind();
+}
+
+function dashboardOverview(summaries: ReturnType<typeof summarizeDebts>): string {
+  return `<section class="dashboard" aria-labelledby="dashboard-heading">
+    <div class="dashboard-heading"><div><p class="eyebrow">YOUR DEBT SNAPSHOT</p><h2 id="dashboard-heading">Repayment overview</h2></div><p>Projections assume your saved rates and monthly payments stay unchanged.</p></div>
+    <div class="dashboard-grid">${summaries.map((summary) => {
+      const payoff = summary.projectedPayoffDate
+        ? summary.projectedPayoffDate.toLocaleDateString("en-GB", {
+            month: "long",
+            year: "numeric",
+          })
+        : "Not yet predictable";
+      return `<article class="dashboard-card">
+        <div class="dashboard-card-head"><span class="dashboard-currency">${summary.currency}</span><span>${summary.debtCount} debt${summary.debtCount === 1 ? "" : "s"}</span></div>
+        <div class="dashboard-balance"><span>Outstanding</span><strong>${formatMoney(summary.debtMinor, summary.currency)}</strong></div>
+        <div class="progress dashboard-progress" role="progressbar" aria-label="${summary.currency} debt repaid" aria-valuenow="${summary.progressPercent.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${summary.progressPercent}%"></i></div>
+        <div class="progress-label"><span>${summary.progressPercent.toFixed(1)}% repaid</span><span>of ${formatMoney(summary.originalDebtMinor, summary.currency)}</span></div>
+        <div class="dashboard-details">
+          <div><span>Personal debt</span><strong>${formatMoney(summary.personalDebtMinor, summary.currency)}</strong></div>
+          <div><span>Business debt</span><strong>${formatMoney(summary.businessDebtMinor, summary.currency)}</strong></div>
+          <div><span>Monthly payments</span><strong>${formatMoney(summary.monthlyPaymentMinor, summary.currency)}</strong></div>
+          <div><span>Projected debt-free</span><strong>${payoff}</strong></div>
+        </div>
+      </article>`;
+    }).join("")}</div>
+  </section>`;
 }
 
 function loanCard(loan: Loan, isArchived = false): string {
