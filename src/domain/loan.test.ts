@@ -3,6 +3,7 @@ import {
   Loan,
   formatMoney,
   projectLoan,
+  summarizeDebts,
   remainingBalanceMinor,
   toMinorUnits,
 } from "./loan";
@@ -77,5 +78,69 @@ describe("currency formatting", () => {
   it("keeps GBP and INR denominations distinct", () => {
     expect(formatMoney(toMinorUnits(1234.5), "GBP")).toContain("£");
     expect(formatMoney(toMinorUnits(1234.5), "INR")).toContain("₹");
+  });
+});
+
+describe("debt dashboard summary", () => {
+  it("summarizes currencies separately and breaks balances down by scope", () => {
+    const summaries = summarizeDebts(
+      [
+        loan({ currentBalanceMinor: toMinorUnits(10_000) }),
+        loan({
+          id: "business-gbp",
+          scope: "business",
+          currentBalanceMinor: toMinorUnits(5_000),
+          monthlyPaymentMinor: toMinorUnits(300),
+        }),
+        loan({
+          id: "personal-inr",
+          currency: "INR",
+          currentBalanceMinor: toMinorUnits(20_000),
+          monthlyPaymentMinor: toMinorUnits(700),
+        }),
+        loan({ id: "archived", archived: true }),
+      ],
+      new Date("2026-09-01T00:00:00Z"),
+    );
+
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0]).toMatchObject({
+      currency: "GBP",
+      debtMinor: toMinorUnits(15_000),
+      personalDebtMinor: toMinorUnits(10_000),
+      businessDebtMinor: toMinorUnits(5_000),
+      monthlyPaymentMinor: toMinorUnits(2_080),
+      personalMonthlyPaymentMinor: toMinorUnits(1_780),
+      businessMonthlyPaymentMinor: toMinorUnits(300),
+    });
+    expect(summaries[1]).toMatchObject({
+      currency: "INR",
+      debtMinor: toMinorUnits(20_000),
+      monthlyPaymentMinor: toMinorUnits(700),
+    });
+  });
+
+  it("excludes cleared balances from monthly payments and leaves uncertain payoff dates blank", () => {
+    const summary = summarizeDebts(
+      [
+        loan({
+          currentBalanceMinor: toMinorUnits(1_000),
+          directRepayments: [
+            { id: "r1", amountMinor: toMinorUnits(1_000), date: "2026-09-01" },
+          ],
+          monthlyPaymentMinor: toMinorUnits(500),
+        }),
+        loan({
+          id: "non-amortising",
+          scope: "business",
+          currentBalanceMinor: toMinorUnits(5_000),
+          monthlyPaymentMinor: toMinorUnits(1),
+        }),
+      ],
+      new Date("2026-09-01T00:00:00Z"),
+    );
+
+    expect(summary[0]!.monthlyPaymentMinor).toBe(toMinorUnits(1));
+    expect(summary[0]!.projectedPayoffDate).toBeNull();
   });
 });
