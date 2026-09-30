@@ -447,3 +447,50 @@ button:focus-visible {
     padding: 18px;
   }
 }
+
+.payment-history {
+  margin: 20px 0;
+  border-top: 1px solid #eaecf0;
+  padding-top: 14px;
+}
+.payment-history summary {
+  cursor: pointer;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+.payment-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.payment-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  font-size: 12px;
+}
+.payment-list li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.payment-list li > div span,
+.payment-list small {
+  color: #667085;
+}
+.payment-list li > strong {
+  text-align: right;
+}
+.payment-list small {
+  grid-column: 1 / -1;
+  line-height: 1.45;
+}
+#payment-extra-fields[hidden] {
+  display: none;
+}
