@@ -121,7 +121,6 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
   };
 }
 
-
 export interface CurrencyDebtSummary {
   currency: Currency;
   debtCount: number;
@@ -188,7 +187,10 @@ export function summarizeDebts(
         originalDebtMinor > 0
           ? Math.min(
               100,
-              Math.max(0, ((originalDebtMinor - debtMinor) / originalDebtMinor) * 100),
+              Math.max(
+                0,
+                ((originalDebtMinor - debtMinor) / originalDebtMinor) * 100,
+              ),
             )
           : 100;
       const outstanding = projected.filter(
@@ -201,7 +203,9 @@ export function summarizeDebts(
             ? null
             : new Date(
                 Math.max(
-                  ...outstanding.map(({ projection }) => projection.payoffDate!.getTime()),
+                  ...outstanding.map(({ projection }) =>
+                    projection.payoffDate!.getTime(),
+                  ),
                 ),
               );
 

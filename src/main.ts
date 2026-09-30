@@ -47,17 +47,20 @@ function render() {
   bind();
 }
 
-function dashboardOverview(summaries: ReturnType<typeof summarizeDebts>): string {
+function dashboardOverview(
+  summaries: ReturnType<typeof summarizeDebts>,
+): string {
   return `<section class="dashboard" aria-labelledby="dashboard-heading">
     <div class="dashboard-heading"><div><p class="eyebrow">YOUR DEBT SNAPSHOT</p><h2 id="dashboard-heading">Repayment overview</h2></div><p>Projections assume your saved rates and monthly payments stay unchanged.</p></div>
-    <div class="dashboard-grid">${summaries.map((summary) => {
-      const payoff = summary.projectedPayoffDate
-        ? summary.projectedPayoffDate.toLocaleDateString("en-GB", {
-            month: "long",
-            year: "numeric",
-          })
-        : "Not yet predictable";
-      return `<article class="dashboard-card">
+    <div class="dashboard-grid">${summaries
+      .map((summary) => {
+        const payoff = summary.projectedPayoffDate
+          ? summary.projectedPayoffDate.toLocaleDateString("en-GB", {
+              month: "long",
+              year: "numeric",
+            })
+          : "Not yet predictable";
+        return `<article class="dashboard-card">
         <div class="dashboard-card-head"><span class="dashboard-currency">${summary.currency}</span><span>${summary.debtCount} debt${summary.debtCount === 1 ? "" : "s"}</span></div>
         <div class="dashboard-balance"><span>Outstanding</span><strong>${formatMoney(summary.debtMinor, summary.currency)}</strong></div>
         <div class="progress dashboard-progress" role="progressbar" aria-label="${summary.currency} debt repaid" aria-valuenow="${summary.progressPercent.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${summary.progressPercent}%"></i></div>
@@ -69,7 +72,8 @@ function dashboardOverview(summaries: ReturnType<typeof summarizeDebts>): string
           <div><span>Projected debt-free</span><strong>${payoff}</strong></div>
         </div>
       </article>`;
-    }).join("")}</div>
+      })
+      .join("")}</div>
   </section>`;
 }
 

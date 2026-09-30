@@ -81,7 +81,6 @@ describe("currency formatting", () => {
   });
 });
 
-
 describe("debt dashboard summary", () => {
   it("summarizes currencies separately and breaks balances down by scope", () => {
     const summaries = summarizeDebts(
