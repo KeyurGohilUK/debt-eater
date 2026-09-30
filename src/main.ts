@@ -1,11 +1,7 @@
 import "./styles.css";
 import {
   Loan,
-  PaymentRecord,
   formatMoney,
-  isValidPaymentRecord,
-  monthlyPaymentTotalMinor,
-  paymentPrincipalMinor,
   projectLoan,
   summarizeDebts,
   toMinorUnits,
@@ -46,7 +42,7 @@ function render() {
       ${archived.length ? `<details class="archived-section"><summary>Archived debts (${archived.length})</summary><div class="loan-grid">${archived.map((loan) => loanCard(loan, true)).join("")}</div></details>` : ""}
     </section>
     <dialog id="loan-dialog">${loanForm()}</dialog>
-    <dialog id="repayment-dialog"><form method="dialog" id="repayment-form"><input type="hidden" name="loanId"><input type="hidden" name="kind"><div class="dialog-head"><div><p class="eyebrow" id="repayment-eyebrow">DIRECT TO PRINCIPAL</p><h2 id="repayment-title">Add repayment</h2></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div><label><span id="repayment-amount-caption">Amount</span> <span id="repayment-currency"></span><input name="amount" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><div class="payment-extra-fields" id="payment-extra-fields" hidden><label>Interest portion<input name="interest" type="number" min="0" step="0.01" value="0" required inputmode="decimal"></label><label>Monthly overpayment<input name="overpayment" type="number" min="0" step="0.01" value="0" required inputmode="decimal"></label></div><label>Date<input name="date" type="date" required></label><p class="form-note" id="payment-help" hidden></p><button class="primary full" id="repayment-submit" value="default">Save repayment</button></form></dialog>
+    <dialog id="repayment-dialog"><form method="dialog" id="repayment-form"><input type="hidden" name="loanId"><div class="dialog-head"><div><p class="eyebrow">DIRECT TO PRINCIPAL</p><h2>Add repayment</h2></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div><label>Amount to principal <span id="repayment-currency"></span><input name="amount" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><label>Date<input name="date" type="date" required></label><button class="primary full" value="default">Apply repayment</button></form></dialog>
   `;
   bind();
 }
@@ -96,7 +92,7 @@ function loanCard(loan: Loan, isArchived = false): string {
     <div class="progress" role="progressbar" aria-label="${escapeHtml(loan.name)} repaid" aria-valuenow="${p.progressPercent.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${p.progressPercent}%"></i></div>
     <div class="progress-label"><span>${p.progressPercent.toFixed(1)}% repaid</span><span>of ${formatMoney(loan.originalBalanceMinor, loan.currency)}</span></div>
     <div class="metrics"><div><span>Required monthly</span><strong>${formatMoney(loan.monthlyPaymentMinor, loan.currency)}</strong></div><div><span>Planned monthly extra</span><strong>${formatMoney(loan.monthlyOverpaymentMinor, loan.currency)}</strong></div><div><span>Tenure</span><strong>${tenure(p.monthsRemaining)}</strong></div><div><span>Payoff</span><strong>${payoff}</strong></div><div><span>Future interest</span><strong>${p.totalInterestMinor === null ? "—" : formatMoney(p.totalInterestMinor, loan.currency)}</strong></div></div>
-    ${paymentHistory(loan)}<div class="card-actions">${isArchived ? `<button class="secondary full restore" data-id="${loan.id}">Restore debt</button>` : `<button class="secondary edit" data-id="${loan.id}">Edit</button><button class="secondary archive" data-id="${loan.id}">Archive</button><button class="secondary full record-payment" data-id="${loan.id}">+ Record monthly payment</button><button class="secondary full repayment" data-id="${loan.id}">+ Direct repayment</button>`}</div>
+    ${paymentHistory(loan)}<div class="card-actions">${isArchived ? `<button class="secondary full restore" data-id="${loan.id}">Restore debt</button>` : `<button class="secondary edit" data-id="${loan.id}">Edit</button><button class="secondary archive" data-id="${loan.id}">Archive</button><button class="secondary full repayment" data-id="${loan.id}">+ Direct repayment</button>`}</div>
   </article>`;
 }
 
@@ -108,16 +104,6 @@ function paymentHistory(loan: Loan): string {
       title: "Direct principal",
       amountMinor: repayment.amountMinor,
       detail: "Applied to principal",
-    })),
-    ...loan.payments.map((payment) => ({
-      id: payment.id,
-      date: payment.date,
-      title: "Monthly payment",
-      amountMinor: payment.amountMinor,
-      detail: `Principal ${formatMoney(
-        paymentPrincipalMinor(payment),
-        loan.currency,
-      )} · Interest ${formatMoney(payment.interestMinor, loan.currency)} · Extra ${formatMoney(payment.overpaymentMinor, loan.currency)}`,
     })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
@@ -148,8 +134,10 @@ function loanForm(): string {
     <label>Debt name<input name="name" required maxlength="60" placeholder="Home mortgage"></label>
     <div class="form-grid"><label>Type<select name="scope"><option value="personal">Personal</option><option value="business">Business</option></select></label><label>Currency<select name="currency"><option value="GBP">GBP · British pound (£)</option><option value="INR">INR · Indian rupee (₹)</option></select><small id="currency-help"></small></label></div>
     <div class="form-grid"><label>Original amount<input name="original" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><label>Current balance<input name="balance" type="number" min="0" step="0.01" required inputmode="decimal"></label></div>
-    <div class="form-grid"><label>Interest rate (%)<input name="rate" type="number" min="0" max="100" step="0.01" required inputmode="decimal"></label><label>Monthly payment<input name="emi" type="number" min="0.01" step="0.01" required inputmode="decimal"></label></div>\n    <label>Planned monthly overpayment<input name="monthlyOverpayment" type="number" min="0" step="0.01" value="0" required inputmode="decimal"></label>
-    <p class="form-note" id="balance-help">Enter the balance currently shown by your lender.</p>
+    <div class="form-grid"><label>Interest rate (%)<input name="rate" type="number" min="0" max="100" step="0.01" required inputmode="decimal"></label><label>Monthly direct debit amount<input name="emi" type="number" min="0.01" step="0.01" required inputmode="decimal"></label></div>
+    <label>Next direct debit date<input name="nextPaymentDate" type="date" required></label>
+    <label>Planned monthly overpayment (optional)<input name="monthlyOverpayment" type="number" min="0" step="0.01" value="0" required inputmode="decimal"></label>
+    <p class="form-note" id="balance-help">Add the direct debit amount and next collection date. The app estimates the remaining schedule; it won’t ask you to record each debit.</p>
     <button class="primary full" id="loan-submit" value="default">Save debt</button></form>`;
 }
 
@@ -166,10 +154,12 @@ function bind() {
     const form = document.querySelector<HTMLFormElement>("#loan-form")!;
     form.reset();
     (form.elements.namedItem("loanId") as HTMLInputElement).value = "";
+    (form.elements.namedItem("nextPaymentDate") as HTMLInputElement).value =
+      new Date().toISOString().slice(0, 10);
     document.querySelector("#loan-form-title")!.textContent = "Add debt";
     document.querySelector("#loan-submit")!.textContent = "Save debt";
     document.querySelector<HTMLElement>("#balance-help")!.textContent =
-      "Enter the balance currently shown by your lender.";
+      "Add the direct debit amount and next collection date. The app estimates the remaining schedule; it won’t ask you to record each debit.";
     const currency = form.elements.namedItem("currency") as HTMLSelectElement;
     currency.disabled = false;
     document.querySelector<HTMLElement>("#currency-help")!.textContent = "";
@@ -206,13 +196,15 @@ function bind() {
       (form.elements.namedItem("emi") as HTMLInputElement).value = (
         loan.monthlyPaymentMinor / 100
       ).toFixed(2);
+      (form.elements.namedItem("nextPaymentDate") as HTMLInputElement).value =
+        loan.nextPaymentDate;
       (
         form.elements.namedItem("monthlyOverpayment") as HTMLInputElement
       ).value = (loan.monthlyOverpaymentMinor / 100).toFixed(2);
       document.querySelector("#loan-form-title")!.textContent = "Edit debt";
       document.querySelector("#loan-submit")!.textContent = "Save changes";
       document.querySelector<HTMLElement>("#balance-help")!.textContent =
-        "Enter the lender’s current balance. Recorded repayments will stay in history.";
+        "The estimate uses this balance, rate and direct debit schedule. Update them if your loan terms change.";
       loanDialog.showModal();
     }),
   );
@@ -251,14 +243,9 @@ function bind() {
             ? "INR"
             : "GBP";
       const repayments = existing?.directRepayments ?? [];
-      const payments = existing?.payments ?? [];
       const savedBalance =
         balance +
-        repayments.reduce((sum, repayment) => sum + repayment.amountMinor, 0) +
-        payments.reduce(
-          (sum, payment) => sum + paymentPrincipalMinor(payment),
-          0,
-        );
+        repayments.reduce((sum, repayment) => sum + repayment.amountMinor, 0);
       const loan: Loan = {
         id: existing?.id ?? uid(),
         name: String(data.get("name")).trim(),
@@ -269,11 +256,11 @@ function bind() {
         currentBalanceMinor: savedBalance,
         annualInterestRateBps: Math.round(Number(data.get("rate")) * 100),
         monthlyPaymentMinor: toMinorUnits(Number(data.get("emi"))),
+        nextPaymentDate: String(data.get("nextPaymentDate")),
         monthlyOverpaymentMinor: toMinorUnits(
           Number(data.get("monthlyOverpayment")),
         ),
         directRepayments: repayments,
-        payments,
       };
       loans = existing
         ? loans.map((item) => (item.id === id ? loan : item))
@@ -283,38 +270,17 @@ function bind() {
       render();
     });
 
-  const openRepaymentDialog = (loanId: string, kind: "direct" | "monthly") => {
+  const openRepaymentDialog = (loanId: string) => {
     const loan = loans.find(({ id }) => id === loanId)!;
     const form = document.querySelector<HTMLFormElement>("#repayment-form")!;
-    const monthly = kind === "monthly";
     form.reset();
     (form.elements.namedItem("loanId") as HTMLInputElement).value = loan.id;
-    (form.elements.namedItem("kind") as HTMLInputElement).value = kind;
     (form.elements.namedItem("date") as HTMLInputElement).value = new Date()
       .toISOString()
       .slice(0, 10);
-    (form.elements.namedItem("amount") as HTMLInputElement).value = monthly
-      ? (monthlyPaymentTotalMinor(loan) / 100).toFixed(2)
-      : "";
-    (form.elements.namedItem("overpayment") as HTMLInputElement).value = monthly
-      ? (loan.monthlyOverpaymentMinor / 100).toFixed(2)
-      : "0";
+    (form.elements.namedItem("amount") as HTMLInputElement).value = "";
     document.querySelector<HTMLElement>("#repayment-currency")!.textContent =
       `(${loan.currency})`;
-    document.querySelector<HTMLElement>("#repayment-title")!.textContent =
-      monthly ? "Record monthly payment" : "Add direct repayment";
-    document.querySelector<HTMLElement>("#repayment-eyebrow")!.textContent =
-      monthly ? "PAYMENT HISTORY" : "DIRECT TO PRINCIPAL";
-    document.querySelector<HTMLElement>(
-      "#repayment-amount-caption",
-    )!.textContent = monthly ? "Total paid" : "Amount to principal";
-    document.querySelector<HTMLElement>("#payment-extra-fields")!.hidden =
-      !monthly;
-    document.querySelector<HTMLElement>("#payment-help")!.hidden = !monthly;
-    document.querySelector<HTMLElement>("#payment-help")!.textContent =
-      "Total paid = principal + interest. Overpayment is part of principal.";
-    document.querySelector<HTMLElement>("#repayment-submit")!.textContent =
-      monthly ? "Save payment" : "Apply repayment";
     repaymentDialog.showModal();
   };
 
@@ -322,14 +288,7 @@ function bind() {
     .querySelectorAll<HTMLButtonElement>(".repayment")
     .forEach((button) =>
       button.addEventListener("click", () =>
-        openRepaymentDialog(button.dataset.id!, "direct"),
-      ),
-    );
-  document
-    .querySelectorAll<HTMLButtonElement>(".record-payment")
-    .forEach((button) =>
-      button.addEventListener("click", () =>
-        openRepaymentDialog(button.dataset.id!, "monthly"),
+        openRepaymentDialog(button.dataset.id!),
       ),
     );
   document
@@ -340,40 +299,18 @@ function bind() {
       const data = new FormData(form);
       const id = String(data.get("loanId"));
       const date = String(data.get("date"));
-      const kind = data.get("kind");
-
-      if (kind === "monthly") {
-        const payment: PaymentRecord = {
-          id: uid(),
-          date,
-          amountMinor: toMinorUnits(Number(data.get("amount"))),
-          interestMinor: toMinorUnits(Number(data.get("interest"))),
-          overpaymentMinor: toMinorUnits(Number(data.get("overpayment"))),
-        };
-        if (!isValidPaymentRecord(payment)) {
-          return alert(
-            "Interest and overpayment must fit within the total payment.",
-          );
-        }
-        loans = loans.map((loan) =>
-          loan.id === id
-            ? { ...loan, payments: [...loan.payments, payment] }
-            : loan,
-        );
-      } else {
-        const amount = toMinorUnits(Number(data.get("amount")));
-        loans = loans.map((loan) =>
-          loan.id === id
-            ? {
-                ...loan,
-                directRepayments: [
-                  ...loan.directRepayments,
-                  { id: uid(), amountMinor: amount, date },
-                ],
-              }
-            : loan,
-        );
-      }
+      const amount = toMinorUnits(Number(data.get("amount")));
+      loans = loans.map((loan) =>
+        loan.id === id
+          ? {
+              ...loan,
+              directRepayments: [
+                ...loan.directRepayments,
+                { id: uid(), amountMinor: amount, date },
+              ],
+            }
+          : loan,
+      );
       localLoanRepository.save(loans);
       repaymentDialog.close();
       render();

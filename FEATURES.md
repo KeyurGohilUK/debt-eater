@@ -46,7 +46,7 @@ Support relevant information such as lender, original balance, current balance, 
 
 ### Payments
 
-Track contractual monthly payments and planned monthly overpayments separately. Record each payment's date, total amount, interest and extra overpayment; calculate its principal reduction and show it alongside direct-to-principal repayments in a dated history.
+Use the monthly direct-debit amount, next collection date and an optional planned monthly overpayment to estimate remaining payments, tenure and payoff date. Routine debits do not require transaction-by-transaction logging. Log only occasional direct-to-principal lump-sum repayments; adjust the schedule inputs if the lender changes the terms. Automatic payment matching is a future integration, not required for projections.
 
 ### Debt progress
 

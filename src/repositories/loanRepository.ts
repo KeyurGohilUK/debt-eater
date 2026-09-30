@@ -1,4 +1,4 @@
-import type { DirectRepayment, Loan, PaymentRecord } from "../domain/loan";
+import type { DirectRepayment, Loan } from "../domain/loan";
 
 const STORAGE_KEY = "debt-eater.loans.v2";
 const LEGACY_STORAGE_KEY = "debt-eater.loans.v1";
@@ -14,10 +14,10 @@ interface LegacyDirectRepayment extends Omit<DirectRepayment, "amountMinor"> {
 
 interface StoredLoan extends Omit<
   Loan,
-  "monthlyOverpaymentMinor" | "payments"
+  "monthlyOverpaymentMinor" | "nextPaymentDate"
 > {
   monthlyOverpaymentMinor?: number;
-  payments?: PaymentRecord[];
+  nextPaymentDate?: string;
 }
 
 interface LegacyLoan extends Omit<
@@ -27,8 +27,8 @@ interface LegacyLoan extends Omit<
   | "originalBalanceMinor"
   | "currentBalanceMinor"
   | "monthlyPaymentMinor"
+  | "nextPaymentDate"
   | "monthlyOverpaymentMinor"
-  | "payments"
   | "directRepayments"
 > {
   originalBalancePence: number;
@@ -51,7 +51,11 @@ export function createLocalLoanRepository(storage: Storage): LoanRepository {
                 (loan.monthlyOverpaymentMinor ?? 0) >= 0
                   ? (loan.monthlyOverpaymentMinor ?? 0)
                   : 0,
-              payments: Array.isArray(loan.payments) ? loan.payments : [],
+              nextPaymentDate:
+                typeof loan.nextPaymentDate === "string" &&
+                !Number.isNaN(Date.parse(loan.nextPaymentDate))
+                  ? loan.nextPaymentDate
+                  : new Date().toISOString().slice(0, 10),
             }),
           );
           storage.setItem(STORAGE_KEY, JSON.stringify(normalized));
@@ -72,8 +76,8 @@ export function createLocalLoanRepository(storage: Storage): LoanRepository {
             currentBalanceMinor: loan.currentBalancePence,
             annualInterestRateBps: loan.annualInterestRateBps,
             monthlyPaymentMinor: loan.monthlyPaymentPence,
+            nextPaymentDate: new Date().toISOString().slice(0, 10),
             monthlyOverpaymentMinor: 0,
-            payments: [],
             directRepayments: loan.directRepayments.map((repayment) => ({
               id: repayment.id,
               amountMinor: repayment.amountPence,

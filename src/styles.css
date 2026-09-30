@@ -491,6 +491,3 @@ button:focus-visible {
   grid-column: 1 / -1;
   line-height: 1.45;
 }
-#payment-extra-fields[hidden] {
-  display: none;
-}
