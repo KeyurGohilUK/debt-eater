@@ -46,7 +46,7 @@ Support relevant information such as lender, original balance, current balance, 
 
 ### Payments
 
-Record payments and track date, amount, principal, interest, overpayment and remaining balance where applicable.
+Track contractual monthly payments and planned monthly overpayments separately. Record each payment's date, total amount, interest and extra overpayment; calculate its principal reduction and show it alongside direct-to-principal repayments in a dated history.
 
 ### Debt progress
 

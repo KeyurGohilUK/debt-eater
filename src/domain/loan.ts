@@ -7,6 +7,14 @@ export interface DirectRepayment {
   date: string;
 }
 
+export interface PaymentRecord {
+  id: string;
+  date: string;
+  amountMinor: number;
+  interestMinor: number;
+  overpaymentMinor: number;
+}
+
 export interface Loan {
   id: string;
   name: string;
@@ -17,7 +25,9 @@ export interface Loan {
   currentBalanceMinor: number;
   annualInterestRateBps: number;
   monthlyPaymentMinor: number;
+  monthlyOverpaymentMinor: number;
   directRepayments: DirectRepayment[];
+  payments: PaymentRecord[];
 }
 
 export interface LoanProjection {
@@ -41,12 +51,36 @@ export function formatMoney(value: number, currency: Currency): string {
   }).format(fromMinorUnits(value));
 }
 
+export function monthlyPaymentTotalMinor(loan: Loan): number {
+  return loan.monthlyPaymentMinor + Math.max(0, loan.monthlyOverpaymentMinor);
+}
+
+export function paymentPrincipalMinor(payment: PaymentRecord): number {
+  return Math.max(0, payment.amountMinor - payment.interestMinor);
+}
+
+export function isValidPaymentRecord(payment: PaymentRecord): boolean {
+  return (
+    Number.isSafeInteger(payment.amountMinor) &&
+    Number.isSafeInteger(payment.interestMinor) &&
+    Number.isSafeInteger(payment.overpaymentMinor) &&
+    payment.amountMinor > 0 &&
+    payment.interestMinor >= 0 &&
+    payment.overpaymentMinor >= 0 &&
+    payment.interestMinor + payment.overpaymentMinor <= payment.amountMinor
+  );
+}
+
 export function remainingBalanceMinor(loan: Loan): number {
   const direct = loan.directRepayments.reduce(
     (sum, item) => sum + item.amountMinor,
     0,
   );
-  return Math.max(0, loan.currentBalanceMinor - direct);
+  const principal = loan.payments.reduce(
+    (sum, payment) => sum + paymentPrincipalMinor(payment),
+    0,
+  );
+  return Math.max(0, loan.currentBalanceMinor - direct - principal);
 }
 
 export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
@@ -75,7 +109,7 @@ export function projectLoan(loan: Loan, from = new Date()): LoanProjection {
   }
 
   const monthlyRate = loan.annualInterestRateBps / 10_000 / 12;
-  const payment = loan.monthlyPaymentMinor;
+  const payment = monthlyPaymentTotalMinor(loan);
   const firstInterest = Math.round(balance * monthlyRate);
 
   if (payment <= firstInterest || payment <= 0) {
@@ -129,6 +163,7 @@ export interface CurrencyDebtSummary {
   personalDebtMinor: number;
   businessDebtMinor: number;
   monthlyPaymentMinor: number;
+  monthlyOverpaymentMinor: number;
   personalMonthlyPaymentMinor: number;
   businessMonthlyPaymentMinor: number;
   progressPercent: number;
@@ -168,6 +203,14 @@ export function summarizeDebts(
           sum +
           (item.projection.adjustedBalanceMinor > 0
             ? item.loan.monthlyPaymentMinor
+            : 0),
+        0,
+      );
+      const monthlyOverpaymentMinor = projected.reduce(
+        (sum, item) =>
+          sum +
+          (item.projection.adjustedBalanceMinor > 0
+            ? Math.max(0, item.loan.monthlyOverpaymentMinor)
             : 0),
         0,
       );
@@ -217,6 +260,7 @@ export function summarizeDebts(
         personalDebtMinor,
         businessDebtMinor,
         monthlyPaymentMinor,
+        monthlyOverpaymentMinor,
         personalMonthlyPaymentMinor,
         businessMonthlyPaymentMinor,
         progressPercent,

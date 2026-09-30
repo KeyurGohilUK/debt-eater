@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   Loan,
   formatMoney,
+  isValidPaymentRecord,
+  paymentPrincipalMinor,
   projectLoan,
   summarizeDebts,
   remainingBalanceMinor,
@@ -18,7 +20,9 @@ const loan = (overrides: Partial<Loan> = {}): Loan => ({
   currentBalanceMinor: toMinorUnits(350_000),
   annualInterestRateBps: 490,
   monthlyPaymentMinor: toMinorUnits(1_780),
+  monthlyOverpaymentMinor: 0,
   directRepayments: [],
+  payments: [],
   ...overrides,
 });
 
@@ -142,5 +146,58 @@ describe("debt dashboard summary", () => {
 
     expect(summary[0]!.monthlyPaymentMinor).toBe(toMinorUnits(1));
     expect(summary[0]!.projectedPayoffDate).toBeNull();
+  });
+});
+
+describe("monthly overpayments and payment history", () => {
+  it("includes planned monthly overpayments in payoff projections", () => {
+    const from = new Date("2026-09-01T00:00:00Z");
+    const regular = projectLoan(loan(), from);
+    const withOverpayment = projectLoan(
+      loan({ monthlyOverpaymentMinor: toMinorUnits(300) }),
+      from,
+    );
+
+    expect(withOverpayment.monthsRemaining!).toBeLessThan(
+      regular.monthsRemaining!,
+    );
+  });
+
+  it("reduces balances by recorded principal and validates payment breakdowns", () => {
+    const payment = {
+      id: "payment-1",
+      date: "2026-09-01",
+      amountMinor: toMinorUnits(1_200),
+      interestMinor: toMinorUnits(300),
+      overpaymentMinor: toMinorUnits(200),
+    };
+
+    expect(isValidPaymentRecord(payment)).toBe(true);
+    expect(paymentPrincipalMinor(payment)).toBe(toMinorUnits(900));
+    expect(remainingBalanceMinor(loan({ payments: [payment] }))).toBe(
+      toMinorUnits(349_100),
+    );
+    expect(
+      isValidPaymentRecord({
+        ...payment,
+        overpaymentMinor: toMinorUnits(1_000),
+      }),
+    ).toBe(false);
+  });
+
+  it("reports planned overpayments separately in each currency summary", () => {
+    const summary = summarizeDebts([
+      loan({ monthlyOverpaymentMinor: toMinorUnits(200) }),
+      loan({
+        id: "business-inr",
+        currency: "INR",
+        scope: "business",
+        monthlyOverpaymentMinor: toMinorUnits(500),
+      }),
+    ]);
+
+    expect(
+      summary.map(({ monthlyOverpaymentMinor }) => monthlyOverpaymentMinor),
+    ).toEqual([toMinorUnits(200), toMinorUnits(500)]);
   });
 });
