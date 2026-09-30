@@ -42,7 +42,7 @@ function render() {
       ${archived.length ? `<details class="archived-section"><summary>Archived debts (${archived.length})</summary><div class="loan-grid">${archived.map((loan) => loanCard(loan, true)).join("")}</div></details>` : ""}
     </section>
     <dialog id="loan-dialog">${loanForm()}</dialog>
-    <dialog id="repayment-dialog"><form method="dialog" id="repayment-form"><input type="hidden" name="loanId"><div class="dialog-head"><div><p class="eyebrow">DIRECT TO PRINCIPAL</p><h2>Add repayment</h2></div><button class="icon" value="cancel" aria-label="Close">×</button></div><label>Amount <span id="repayment-currency"></span><input name="amount" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><label>Date<input name="date" type="date" required></label><button class="primary full" value="default">Apply repayment</button></form></dialog>
+    <dialog id="repayment-dialog"><form method="dialog" id="repayment-form"><input type="hidden" name="loanId"><div class="dialog-head"><div><p class="eyebrow">DIRECT TO PRINCIPAL</p><h2>Add repayment</h2></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div><label>Amount <span id="repayment-currency"></span><input name="amount" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><label>Date<input name="date" type="date" required></label><button class="primary full" value="default">Apply repayment</button></form></dialog>
   `;
   bind();
 }
@@ -100,7 +100,7 @@ function emptyState(): string {
 }
 
 function loanForm(): string {
-  return `<form method="dialog" id="loan-form"><input type="hidden" name="loanId"><div class="dialog-head"><div><p class="eyebrow">EXISTING DEBT</p><h2 id="loan-form-title">Add debt</h2></div><button class="icon" value="cancel" aria-label="Close">×</button></div>
+  return `<form method="dialog" id="loan-form"><input type="hidden" name="loanId"><div class="dialog-head"><div><p class="eyebrow">EXISTING DEBT</p><h2 id="loan-form-title">Add debt</h2></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div>
     <label>Debt name<input name="name" required maxlength="60" placeholder="Home mortgage"></label>
     <div class="form-grid"><label>Type<select name="scope"><option value="personal">Personal</option><option value="business">Business</option></select></label><label>Currency<select name="currency"><option value="GBP">GBP · British pound (£)</option><option value="INR">INR · Indian rupee (₹)</option></select><small id="currency-help"></small></label></div>
     <div class="form-grid"><label>Original amount<input name="original" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><label>Current balance<input name="balance" type="number" min="0" step="0.01" required inputmode="decimal"></label></div>
@@ -113,6 +113,11 @@ function bind() {
   const loanDialog = document.querySelector<HTMLDialogElement>("#loan-dialog")!;
   const repaymentDialog =
     document.querySelector<HTMLDialogElement>("#repayment-dialog")!;
+  document
+    .querySelectorAll<HTMLButtonElement>(".dialog-close")
+    .forEach((button) =>
+      button.addEventListener("click", () => button.closest("dialog")?.close()),
+    );
   const openNewLoan = () => {
     const form = document.querySelector<HTMLFormElement>("#loan-form")!;
     form.reset();

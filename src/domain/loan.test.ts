@@ -140,7 +140,7 @@ describe("debt dashboard summary", () => {
       new Date("2026-09-01T00:00:00Z"),
     );
 
-    expect(summary[0]!.monthlyPaymentMinor).toBe(toMinorUnits(1));
-    expect(summary[0]!.projectedPayoffDate).toBeNull();
+    expect(summary[0].monthlyPaymentMinor).toBe(toMinorUnits(1));
+    expect(summary[0].projectedPayoffDate).toBeNull();
   });
 });
