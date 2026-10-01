@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("closes both dialogs on desktop and mobile viewports", async ({
+test("closes every dialog on desktop and mobile viewports", async ({
   page,
 }) => {
   await page.goto("./");
@@ -23,6 +23,12 @@ test("closes both dialogs on desktop and mobile viewports", async ({
   await page.locator('#loan-form input[name="emi"]').fill("1000");
   await page.getByRole("button", { name: "Save debt" }).click();
   await expect(loanDialog).toBeHidden();
+
+  const simulatorDialog = page.locator("#simulator-dialog");
+  await page.getByRole("button", { name: "Simulate repayments" }).click();
+  await expect(simulatorDialog).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(simulatorDialog).toBeHidden();
 
   await page.getByRole("button", { name: /Direct repayment/ }).click();
   const repaymentDialog = page.locator("#repayment-dialog");
