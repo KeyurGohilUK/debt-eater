@@ -19,6 +19,9 @@ test("compares a repayment scenario without saving changes", async ({
     localStorage.getItem("debt-eater.loans.v2"),
   );
   await page.getByRole("button", { name: "Simulate repayments" }).click();
+  await expect(page.locator(".loan-card .metrics")).toContainText(
+    /\(\d+ months\)/,
+  );
 
   const dialog = page.getByRole("dialog", { name: "Repayment simulator" });
   await expect(dialog).toBeVisible();
@@ -32,6 +35,9 @@ test("compares a repayment scenario without saving changes", async ({
     "With scenario",
   );
   await expect(dialog.locator(".simulator-savings")).not.toContainText("—");
+  await expect(dialog.locator(".simulator-savings")).toContainText(
+    /\(\d+ months\)/,
+  );
   await expect(dialog.locator(".scenario-line")).toBeVisible();
   expect(
     await page.evaluate(() => localStorage.getItem("debt-eater.loans.v2")),

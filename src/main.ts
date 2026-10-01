@@ -19,10 +19,11 @@ const archivedLoans = () => loans.filter((loan) => loan.archived);
 
 function tenure(months: number | null): string {
   if (months === null) return "Payment too low";
-  if (months === 0) return "Cleared";
+  if (months === 0) return "Cleared (0 months)";
   const years = Math.floor(months / 12);
   const rest = months % 12;
-  return years ? `${years}y ${rest}m` : `${rest}m`;
+  if (years === 0) return `${months} month${months === 1 ? "" : "s"}`;
+  return `${years}y ${rest}m (${months} months)`;
 }
 
 function render() {
