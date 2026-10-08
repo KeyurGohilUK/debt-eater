@@ -1,8 +1,21 @@
-# Debt Eater — Feature Roadmap
+# Finance Tracker — Feature Roadmap
 
 This document defines product scope. Engineering and agent rules live in `AGENTS.md`.
 
 ## P1 — Core MVP
+
+### Finance sections
+
+- Present Debt Eater as the debt-management section within Finance Tracker.
+- Keep Investments & Savings as a separate feature using its own domain and repository.
+- Use shared money types and currency formatting; do not combine currencies without explicit FX rates.
+
+### Investments & savings
+
+- Add, edit and delete dated entries for an investment or savings asset.
+- Track provider, asset name, category/account, personal or business owner, invested amount, currency, contribution frequency and optional manually entered current value.
+- Show invested totals, entered valuations and value change separately for GBP, EUR and INR.
+- Make clear that missing valuations are not zero and market prices are not fetched automatically.
 
 ### Dashboard
 
@@ -123,11 +136,9 @@ Forecasts must always be clearly distinguished from factual historical data.
 
 Keep navigation small:
 
-- Dashboard
-- Debts
-- Simulator
-- History
-- Settings
+- Debt Eater
+- Investments & savings
+- Finance overview
 
 Business/entity selection should generally behave as context/filtering rather than a separate duplicate application section.
 

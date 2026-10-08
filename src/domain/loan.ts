@@ -1,5 +1,7 @@
 export type DebtScope = "personal" | "business";
-export type Currency = "GBP" | "INR";
+export type { Currency } from "./money";
+export { formatMoney, fromMinorUnits, toMinorUnits } from "./money";
+import type { Currency } from "./money";
 
 export interface DirectRepayment {
   id: string;
@@ -41,19 +43,6 @@ export interface LoanSimulation {
 export interface LoanSimulationInput {
   additionalMonthlyPaymentMinor: number;
   lumpSumMinor: number;
-}
-
-export const toMinorUnits = (value: number): number => Math.round(value * 100);
-export const fromMinorUnits = (value: number): number => value / 100;
-
-export function formatMoney(value: number, currency: Currency): string {
-  const locale = currency === "INR" ? "en-IN" : "en-GB";
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(fromMinorUnits(value));
 }
 
 export function monthlyPaymentTotalMinor(loan: Loan): number {
@@ -215,7 +204,7 @@ export function summarizeDebts(
   from = new Date(),
 ): CurrencyDebtSummary[] {
   const active = loans.filter((loan) => !loan.archived);
-  return (["GBP", "INR"] as const)
+  return (["GBP", "EUR", "INR"] as const)
     .map((currency) => {
       const currencyLoans = active.filter((loan) => loan.currency === currency);
       if (currencyLoans.length === 0) return null;
