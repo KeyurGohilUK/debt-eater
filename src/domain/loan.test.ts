@@ -81,6 +81,7 @@ describe("currency formatting", () => {
   it("keeps GBP and INR denominations distinct", () => {
     expect(formatMoney(toMinorUnits(1234.5), "GBP")).toContain("£");
     expect(formatMoney(toMinorUnits(1234.5), "INR")).toContain("₹");
+    expect(formatMoney(toMinorUnits(1234.5), "EUR")).toContain("€");
   });
 });
 

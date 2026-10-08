@@ -4,6 +4,7 @@ test("closes every dialog on desktop and mobile viewports", async ({
   page,
 }) => {
   await page.goto("./");
+  await page.getByRole("link", { name: "Debt Eater" }).click();
   await page.getByRole("button", { name: "Add existing debt" }).click();
 
   const loanDialog = page.locator("#loan-dialog");

@@ -8,11 +8,23 @@ import {
   toMinorUnits,
 } from "./domain/loan";
 import { localLoanRepository } from "./repositories/loanRepository";
+import { mountInvestments } from "./features/investments/view";
+import { summarizeInvestments } from "./domain/investment";
+import { localInvestmentRepository } from "./repositories/investmentRepository";
+import { escapeHtml } from "./shared/html";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw new Error("Application root not found");
 
 let loans = localLoanRepository.list();
+type AppModule = "overview" | "debts" | "investments";
+let activeModule: AppModule = parseModule(window.location.hash);
+
+function parseModule(hash: string): AppModule {
+  if (hash === "#/investments") return "investments";
+  if (hash === "#/debts") return "debts";
+  return "overview";
+}
 const uid = () => crypto.randomUUID();
 const activeLoans = () => loans.filter((loan) => !loan.archived);
 const archivedLoans = () => loans.filter((loan) => loan.archived);
@@ -27,15 +39,27 @@ function tenure(months: number | null): string {
 }
 
 function render() {
+  const header = `<header class="topbar"><div><img class="brand-icon" src="./debt-eater-icon.png" alt="" /><strong>Finance Tracker</strong></div><nav class="module-nav" aria-label="Finance sections"><a href="#/overview" aria-label="Overview" ${activeModule === "overview" ? 'aria-current="page"' : ""}>Overview</a><a href="#/debts" aria-label="Debt Eater" ${activeModule === "debts" ? 'aria-current="page"' : ""}><span class="nav-label-full">Debt Eater</span><span class="nav-label-short">Debt</span></a><a href="#/investments" aria-label="Investments &amp; savings" ${activeModule === "investments" ? 'aria-current="page"' : ""}><span class="nav-label-full">Investments &amp; savings</span><span class="nav-label-short">Investments</span></a></nav>${activeModule === "debts" ? '<button class="primary" id="add-loan">+ Add debt</button>' : ""}</header>`;
+  if (activeModule === "overview") {
+    app!.innerHTML = `${header}${financeOverview()}`;
+    return;
+  }
+  if (activeModule === "investments") {
+    app!.innerHTML = `${header}<main id="module-content"></main>`;
+    const content = document.querySelector<HTMLElement>("#module-content");
+    if (content) mountInvestments(content);
+    return;
+  }
+
   const active = activeLoans();
   const archived = archivedLoans();
   const summaries = summarizeDebts(active);
 
   app!.innerHTML = `
-    <header class="topbar"><div><img class="brand-icon" src="./debt-eater-icon.png" alt="" /><strong>Debt Eater</strong></div><button class="primary" id="add-loan">+ Add debt</button></header>
+    ${header}
     <section class="hero">
       <p class="eyebrow">ACTIVE DEBT</p>
-      <div class="total-list">${summaries.length ? summaries.map(({ currency, debtMinor }) => `<div class="total-item"><span>${currency === "GBP" ? "British pounds" : "Indian rupees"}</span><h1>${formatMoney(debtMinor, currency)}</h1></div>`).join("") : `<h1>${formatMoney(0, "GBP")}</h1>`}</div>
+      <div class="total-list">${summaries.length ? summaries.map(({ currency, debtMinor }) => `<div class="total-item"><span>${currency === "GBP" ? "Pound sterling" : currency === "EUR" ? "Euro" : "Indian rupees"}</span><h1>${formatMoney(debtMinor, currency)}</h1></div>`).join("") : `<h1>${formatMoney(0, "GBP")}</h1>`}</div>
       <div class="scope"><span>${active.length} active debt${active.length === 1 ? "" : "s"}</span><span>Stored on this device</span></div>
     </section>
     ${active.length ? dashboardOverview(summaries) : ""}
@@ -48,6 +72,41 @@ function render() {
     <dialog id="simulator-dialog" aria-labelledby="simulator-title"><section class="simulator-shell"><div class="dialog-head"><div><p class="eyebrow">WHAT IF?</p><h2 id="simulator-title">Repayment simulator</h2><p class="simulator-debt" id="simulator-debt"></p></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div><form id="simulator-form"><input type="hidden" name="loanId"><label>Extra each month <span id="simulator-currency"></span><input name="monthlyExtra" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label><label>One-off repayment now <span id="simulator-lump-currency"></span><input name="lumpSum" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label><p class="simulator-note">Uses your saved balance, interest rate and direct-debit schedule. Scenario changes are not saved.</p></form><div id="simulator-results" aria-live="polite"></div></section></dialog>
   `;
   bind();
+}
+
+function financeOverview(): string {
+  const debtSummaries = summarizeDebts(activeLoans());
+  const investmentSummaries = summarizeInvestments(
+    localInvestmentRepository.list(),
+  );
+  const debtCards = debtSummaries.length
+    ? debtSummaries
+        .map(
+          (summary) => `<article class="finance-currency-card">
+            <span class="dashboard-currency">${summary.currency}</span>
+            <div><span>Outstanding debt</span><strong>${formatMoney(summary.debtMinor, summary.currency)}</strong></div>
+            <small>${summary.debtCount} active debt${summary.debtCount === 1 ? "" : "s"}</small>
+          </article>`,
+        )
+        .join("")
+    : `<p class="overview-empty">No active debts</p>`;
+  const investmentCards = investmentSummaries.length
+    ? investmentSummaries
+        .map(
+          (summary) => `<article class="finance-currency-card">
+            <span class="dashboard-currency">${summary.currency}</span>
+            <div><span>Invested</span><strong>${formatMoney(summary.investedMinor, summary.currency)}</strong></div>
+            <small>${summary.valuedEntryCount} of ${summary.entryCount} entries valued${summary.valuedEntryCount ? ` · Current value ${formatMoney(summary.currentValueMinor, summary.currency)}` : ""}</small>
+          </article>`,
+        )
+        .join("")
+    : `<p class="overview-empty">No investment or savings entries</p>`;
+
+  return `<main class="finance-overview">
+    <section class="overview-welcome"><p class="eyebrow">YOUR FINANCES</p><h1>One clear view of your money</h1><p>Track debt, investments and savings in one place.</p></section>
+    <section class="overview-feature" aria-labelledby="overview-debts-title"><div class="overview-feature-head"><div><p class="eyebrow">DEBT MANAGEMENT</p><h2 id="overview-debts-title">Debt Eater</h2></div><a class="secondary" href="#/debts">Open debts <span aria-hidden="true">→</span></a></div><div class="finance-currency-grid">${debtCards}</div></section>
+    <section class="overview-feature" aria-labelledby="overview-investments-title"><div class="overview-feature-head"><div><p class="eyebrow">ASSETS</p><h2 id="overview-investments-title">Investments &amp; savings</h2></div><a class="secondary" href="#/investments">Open investments <span aria-hidden="true">→</span></a></div><div class="finance-currency-grid">${investmentCards}</div></section>
+  </main>`;
 }
 
 function dashboardOverview(
@@ -135,7 +194,7 @@ function emptyState(): string {
 function loanForm(): string {
   return `<form method="dialog" id="loan-form"><input type="hidden" name="loanId"><div class="dialog-head"><div><p class="eyebrow">EXISTING DEBT</p><h2 id="loan-form-title">Add debt</h2></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div>
     <label>Debt name<input name="name" required maxlength="60" placeholder="Home mortgage"></label>
-    <div class="form-grid"><label>Type<select name="scope"><option value="personal">Personal</option><option value="business">Business</option></select></label><label>Currency<select name="currency"><option value="GBP">GBP · British pound (£)</option><option value="INR">INR · Indian rupee (₹)</option></select><small id="currency-help"></small></label></div>
+    <div class="form-grid"><label>Type<select name="scope"><option value="personal">Personal</option><option value="business">Business</option></select></label><label>Currency<select name="currency"><option value="GBP">GBP · Pound sterling (£)</option><option value="EUR">EUR · Euro (€)</option><option value="INR">INR · Indian rupee (₹)</option></select><small id="currency-help"></small></label></div>
     <div class="form-grid"><label>Original amount<input name="original" type="number" min="0.01" step="0.01" required inputmode="decimal"></label><label>Current balance<input name="balance" type="number" min="0" step="0.01" required inputmode="decimal"></label></div>
     <div class="form-grid"><label>Interest rate (%)<input name="rate" type="number" min="0" max="100" step="0.01" required inputmode="decimal"></label><label>Monthly direct debit amount<input name="emi" type="number" min="0.01" step="0.01" required inputmode="decimal"></label></div>
     <label>Next direct debit date<input name="nextPaymentDate" type="date" required></label>
@@ -246,7 +305,9 @@ function bind() {
           ? existing.currency
           : data.get("currency") === "INR"
             ? "INR"
-            : "GBP";
+            : data.get("currency") === "EUR"
+              ? "EUR"
+              : "GBP";
       const repayments = existing?.directRepayments ?? [];
       const savedBalance =
         balance +
@@ -407,10 +468,9 @@ function updateLoan(id: string, changes: Partial<Loan>) {
   render();
 }
 
-function escapeHtml(value: string): string {
-  const div = document.createElement("div");
-  div.textContent = value;
-  return div.innerHTML;
-}
+window.addEventListener("hashchange", () => {
+  activeModule = parseModule(window.location.hash);
+  render();
+});
 
 render();

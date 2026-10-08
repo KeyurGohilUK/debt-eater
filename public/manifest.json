@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Debt Eater",
-  "short_name": "Debt Eater",
-  "description": "Visual personal and business debt tracker",
+  "name": "Finance Tracker",
+  "short_name": "Finances",
+  "description": "Visual personal and business finance tracker",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

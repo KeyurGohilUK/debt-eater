@@ -1,13 +1,14 @@
-# Debt Eater
+# Finance Tracker
 
-Debt Eater is a fast, visual-first application for tracking and managing personal and business debt.
+Finance Tracker is a fast, visual-first application for personal and business finances. Debt Eater is its debt-management feature; Investments & Savings tracks contributions and manually entered valuations.
 
-The goal is to make a complete debt position understandable at a glance: how much is owed, where it sits, how quickly it is falling, when debts are projected to be cleared, and how additional repayments change the outcome.
+The goal is to make a financial position understandable at a glance: what is owed, what has been invested, how balances are changing, and what repayment scenarios may mean.
 
 ## Product principles
 
 - Financial correctness first
-- Personal and business debt in one reusable domain model
+- Personal and business records in reusable domain models
+- Multi-currency values remain separate unless an exchange rate is explicitly provided
 - Visual-first UX with minimal wording
 - Fast, responsive, mobile-first experience
 - Secure handling of sensitive financial data
@@ -16,7 +17,7 @@ The goal is to make a complete debt position understandable at a glance: how muc
 
 ## Product scope
 
-The initial product will focus on a dashboard, debt management, payments, debt detail, visual repayment progress and repayment simulation. See [FEATURES.md](FEATURES.md) for the evolving product roadmap.
+The app currently includes Debt Eater and an Investments & Savings ledger. Investment contributions and current values are stored separately, totals are grouped by GBP, EUR and INR, and current values are entered manually. See [FEATURES.md](FEATURES.md) for the evolving product roadmap.
 
 ## Engineering
 
