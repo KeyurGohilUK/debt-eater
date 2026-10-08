@@ -4,6 +4,7 @@ test("projects from the direct debit schedule and logs only extra repayments", a
   page,
 }) => {
   await page.goto("./");
+  await page.getByRole("link", { name: "Debt Eater" }).click();
   await page.getByRole("button", { name: "Add existing debt" }).click();
   await page.locator('#loan-form input[name="name"]').fill("Home mortgage");
   await page.locator('#loan-form input[name="original"]').fill("100000");

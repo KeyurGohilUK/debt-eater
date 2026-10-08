@@ -4,6 +4,7 @@ test("compares a repayment scenario without saving changes", async ({
   page,
 }) => {
   await page.goto("./");
+  await page.getByRole("link", { name: "Debt Eater" }).click();
   await page.getByRole("button", { name: "Add existing debt" }).click();
   await page.locator('#loan-form input[name="name"]').fill("Home mortgage");
   await page.locator('#loan-form input[name="original"]').fill("100000");
