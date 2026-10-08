@@ -1,5 +1,30 @@
 import { expect, test } from "@playwright/test";
 
+test("date field stays within the investment dialog on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("link", { name: "Investments & savings" }).click();
+  await page.getByRole("button", { name: "+ Add entry" }).click();
+
+  const dateInput = page.getByLabel("Date");
+  const dateBounds = await dateInput.boundingBox();
+  const formBounds = await page
+    .locator("#investment-dialog form")
+    .boundingBox();
+  const formPaddingRight = await page
+    .locator("#investment-dialog form")
+    .evaluate((form) => parseFloat(getComputedStyle(form).paddingRight));
+
+  expect(dateBounds).not.toBeNull();
+  expect(formBounds).not.toBeNull();
+  expect(dateBounds!.x).toBeGreaterThanOrEqual(formBounds!.x);
+  expect(dateBounds!.x + dateBounds!.width).toBeLessThanOrEqual(
+    formBounds!.x + formBounds!.width - formPaddingRight + 1,
+  );
+});
+
 test("records investment entries and keeps currency totals separate", async ({
   page,
 }) => {
