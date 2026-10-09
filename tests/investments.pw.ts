@@ -79,6 +79,7 @@ test("commodities and investments use separate views over the same ledger", asyn
     .selectOption("silver");
   await page.getByLabel("Quantity").fill("5");
   await page.getByLabel("Weight per item").fill("10");
+  await page.getByLabel("Weight unit").selectOption("g");
   await page
     .locator("#investment-form")
     .getByRole("button", { name: "Save metal" })
