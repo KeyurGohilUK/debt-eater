@@ -14,8 +14,10 @@ This document defines product scope. Engineering and agent rules live in `AGENTS
 
 - Add, edit and delete dated entries for an investment or savings asset.
 - Track provider, asset name, category/account, personal or business owner, invested amount, currency, contribution frequency and optional manually entered current value.
-- Show invested totals, entered valuations and value change separately for GBP, EUR and INR.
-- Make clear that missing valuations are not zero and market prices are not fetched automatically.
+- Track physical and digital gold or silver by quantity, weight, unit and purity/fineness.
+- Estimate bullion value from automatically cached spot prices and daily GBP, EUR or INR reference exchange rates.
+- Show invested totals, manual or estimated valuations and value change separately for GBP, EUR and INR.
+- Make clear that missing valuations are not zero and spot-based estimates exclude premiums, fees, VAT and resale spreads.
 
 ### Dashboard
 

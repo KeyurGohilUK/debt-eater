@@ -5,27 +5,79 @@ import {
   toMinorUnits,
 } from "../../domain/money";
 import {
+  resolveInvestmentValues,
   summarizeInvestments,
+  type BullionHolding,
+  type BullionMetal,
   type InvestmentEntry,
   type InvestmentScope,
 } from "../../domain/investment";
 import { localInvestmentRepository } from "../../repositories/investmentRepository";
+import {
+  metalPriceService,
+  type MetalPriceResult,
+} from "../../services/metalPriceService";
 import { escapeHtml } from "../../shared/html";
 
 const uid = () => crypto.randomUUID();
 const today = () => new Date().toISOString().slice(0, 10);
+const formatNumber = (value: number) =>
+  new Intl.NumberFormat("en-GB", { maximumFractionDigits: 3 }).format(value);
 
 export function mountInvestments(container: HTMLElement): void {
   let entries = localInvestmentRepository.list();
+  let priceResult: MetalPriceResult | null = null;
+  let priceLoadComplete = false;
+  let deferPriceRender = false;
+
+  const metalPriceStatus = (): string => {
+    if (!priceLoadComplete)
+      return `<div class="metal-price-status" role="status"><span class="price-dot loading"></span><span>Updating gold and silver prices…</span></div>`;
+    if (!priceResult)
+      return `<div class="metal-price-status warning" role="status"><span class="price-dot"></span><span>Spot prices unavailable. Manual values are unchanged.</span></div>`;
+    const { snapshot, stale } = priceResult;
+    const updated = new Date(snapshot.fetchedAt).toLocaleString("en-GB", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return `<div class="metal-price-status ${stale ? "warning" : ""}" role="status"><span class="price-dot"></span><span>${stale ? "Using last available prices" : "Spot prices updated"} ${escapeHtml(updated)} · Gold $${formatNumber(snapshot.usdPerTroyOunce.gold)} · Silver $${formatNumber(snapshot.usdPerTroyOunce.silver)} / troy oz</span></div>`;
+  };
+
+  const bullionDescription = (holding: BullionHolding): string =>
+    `${holding.metal} · ${formatNumber(holding.quantity)} × ${formatNumber(holding.weightPerItem)} ${holding.weightUnit} · ${formatNumber(holding.purity)} fine · ${holding.holdingType}`;
+
+  const investmentCard = (
+    entry: InvestmentEntry,
+    valuesById: ReadonlyMap<string, number>,
+  ) => {
+    const currentValue = valuesById.get(entry.id) ?? entry.currentValueMinor;
+    const valueLabel = entry.bullion ? "Est. metal value" : "Current value";
+    const bullionMeta = entry.bullion
+      ? `<span>·</span> ${escapeHtml(bullionDescription(entry.bullion))}`
+      : "";
+    return `<article class="investment-card">
+      <div class="investment-date">${escapeHtml(new Date(`${entry.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}</div>
+      <div class="investment-card-main"><div class="investment-card-title"><h3>${escapeHtml(entry.asset)}</h3><span class="investment-category">${escapeHtml(entry.category)}</span></div><div class="investment-meta">${escapeHtml(entry.provider)} <span>·</span> ${entry.scope} <span>·</span> ${escapeHtml(entry.frequency)} ${bullionMeta}</div></div>
+      <div class="investment-amounts"><div><span>Invested</span><strong>${formatMoney(entry.investedMinor, entry.currency)}</strong></div><div><span>${valueLabel}</span><strong>${currentValue === null ? "—" : formatMoney(currentValue, entry.currency)}</strong></div></div>
+      <div class="investment-actions"><button class="secondary edit-investment" data-id="${escapeHtml(entry.id)}">Edit</button><button class="secondary delete-investment" data-id="${escapeHtml(entry.id)}" aria-label="Delete ${escapeHtml(entry.asset)}">Delete</button></div>
+    </article>`;
+  };
 
   const render = () => {
-    const summaries = summarizeInvestments(entries);
+    const valuesById = resolveInvestmentValues(
+      entries,
+      priceResult?.snapshot ?? null,
+    );
+    const summaries = summarizeInvestments(entries, valuesById);
     container.innerHTML = `
       <section class="investment-page" aria-labelledby="investments-title">
         <div class="investment-heading">
           <div><p class="eyebrow">PORTFOLIO</p><h1 id="investments-title">Investments &amp; savings</h1><p class="investment-subtitle">A clear view of what you’ve put aside, across accounts and currencies.</p></div>
           <button class="primary" id="add-investment">+ Add entry</button>
         </div>
+        ${metalPriceStatus()}
         <div class="investment-summary" aria-label="Investment totals">
           ${
             summaries.length
@@ -48,7 +100,7 @@ export function mountInvestments(container: HTMLElement): void {
                 ...entries,
               ]
                 .sort((a, b) => b.date.localeCompare(a.date))
-                .map((entry) => investmentCard(entry))
+                .map((entry) => investmentCard(entry, valuesById))
                 .join("")}</div></section>`
             : ""
         }
@@ -57,46 +109,119 @@ export function mountInvestments(container: HTMLElement): void {
           <div class="dialog-head"><div><p class="eyebrow">INVESTMENT OR SAVING</p><h2 id="investment-form-title">Add entry</h2></div><button type="button" class="icon investment-close" aria-label="Close">×</button></div>
           <div class="form-grid"><label>Date<input name="date" type="date" required></label><label>Account / provider<input name="provider" maxlength="80" placeholder="Trading 212" required></label></div>
           <label>Investment or saving<input name="asset" maxlength="100" placeholder="Global index fund" required></label>
-          <div class="form-grid"><label>Category<input name="category" list="investment-categories" maxlength="60" placeholder="Stocks ISA UK" required><datalist id="investment-categories"><option>Stock UK</option><option>Stocks ISA UK</option><option>SIP India</option><option>Cash ISA UK</option><option>Gold Physical</option><option>Stock India</option></datalist></label><label>Owner<select name="scope"><option value="personal">Personal</option><option value="business">Business</option></select></label></div>
+          <div class="form-grid"><label>Category<input name="category" list="investment-categories" maxlength="60" placeholder="Stocks ISA UK" required><datalist id="investment-categories"><option>Stock UK</option><option>Stocks ISA UK</option><option>SIP India</option><option>Cash ISA UK</option><option>Gold Physical</option><option>Gold Digital</option><option>Silver Physical</option><option>Silver Digital</option><option>Stock India</option></datalist></label><label>Owner<select name="scope"><option value="personal">Personal</option><option value="business">Business</option></select></label></div>
           <div class="form-grid"><label>Amount invested<input name="invested" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><label>Currency<select name="currency"><option value="GBP">GBP · Pound sterling</option><option value="EUR">EUR · Euro</option><option value="INR">INR · Indian rupee</option></select></label></div>
-          <div class="form-grid"><label>Current value <small>Optional; enter it when you update a valuation.</small><input name="currentValue" type="number" min="0" step="0.01" inputmode="decimal"></label><label>Contribution frequency<input name="frequency" list="investment-frequencies" maxlength="40" value="One time" placeholder="Every 15 days" required><datalist id="investment-frequencies"><option>One time</option><option>Weekly</option><option>Every 15 days</option><option>Monthly</option><option>Quarterly</option><option>Yearly</option><option>Stopped</option></datalist></label></div>
-          <p class="form-note">Totals stay separate by currency. Current values are entered by you; the app does not fetch market prices.</p>
+          <div class="form-grid"><label>Valuation<select name="valuationMethod"><option value="manual">Manual value</option><option value="gold">Gold spot price</option><option value="silver">Silver spot price</option></select></label><label>Contribution frequency<input name="frequency" list="investment-frequencies" maxlength="40" value="One time" placeholder="Every 15 days" required><datalist id="investment-frequencies"><option>One time</option><option>Weekly</option><option>Every 15 days</option><option>Monthly</option><option>Quarterly</option><option>Yearly</option><option>Stopped</option></datalist></label></div>
+          <label class="manual-value-field">Current value <small>Optional; enter it when you update a valuation.</small><input name="currentValue" type="number" min="0" step="0.01" inputmode="decimal"></label>
+          <fieldset class="bullion-fields" hidden>
+            <legend>Bullion details</legend>
+            <div class="form-grid"><label>Holding type<select name="holdingType"><option value="physical">Physical</option><option value="digital">Digital</option></select></label><label>Quantity<input name="quantity" type="number" min="0.000001" step="any" inputmode="decimal" value="1"></label></div>
+            <div class="form-grid bullion-weight-grid"><label>Weight per item<input name="weightPerItem" type="number" min="0.000001" step="any" inputmode="decimal" value="1"></label><label>Weight unit<select name="weightUnit"><option value="toz">Troy ounce</option><option value="g">Gram</option></select></label><label>Purity / fineness<input name="purity" type="number" min="1" max="1000" step="0.1" inputmode="decimal" value="999.9"></label></div>
+            <p class="form-note">Estimated metal value uses fine weight and the latest cached spot price. Dealer premiums, fees, VAT and resale spreads are excluded.</p>
+          </fieldset>
+          <p class="form-note">Totals remain separate by currency. Manual values are used for non-bullion assets.</p>
           <button class="primary full" id="investment-submit">Save entry</button>
         </form></dialog>
       </section>`;
     bind();
   };
 
-  const investmentCard = (
-    entry: InvestmentEntry,
-  ) => `<article class="investment-card">
-    <div class="investment-date">${escapeHtml(new Date(`${entry.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}</div>
-    <div class="investment-card-main"><div class="investment-card-title"><h3>${escapeHtml(entry.asset)}</h3><span class="investment-category">${escapeHtml(entry.category)}</span></div><div class="investment-meta">${escapeHtml(entry.provider)} <span>·</span> ${entry.scope} <span>·</span> ${escapeHtml(entry.frequency)}</div></div>
-    <div class="investment-amounts"><div><span>Invested</span><strong>${formatMoney(entry.investedMinor, entry.currency)}</strong></div><div><span>Current value</span><strong>${entry.currentValueMinor === null ? "—" : formatMoney(entry.currentValueMinor, entry.currency)}</strong></div></div>
-    <div class="investment-actions"><button class="secondary edit-investment" data-id="${escapeHtml(entry.id)}">Edit</button><button class="secondary delete-investment" data-id="${escapeHtml(entry.id)}" aria-label="Delete ${escapeHtml(entry.asset)}">Delete</button></div>
-  </article>`;
+  const readBullion = (data: FormData): BullionHolding | null => {
+    const metal = data.get("valuationMethod");
+    if (metal !== "gold" && metal !== "silver") return null;
+    const quantity = Number(data.get("quantity"));
+    const weightPerItem = Number(data.get("weightPerItem"));
+    const purity = Number(data.get("purity"));
+    if (
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      !Number.isFinite(weightPerItem) ||
+      weightPerItem <= 0 ||
+      !Number.isFinite(purity) ||
+      purity <= 0 ||
+      purity > 1000
+    )
+      return null;
+    return {
+      metal: metal as BullionMetal,
+      holdingType:
+        data.get("holdingType") === "digital" ? "digital" : "physical",
+      quantity,
+      weightPerItem,
+      weightUnit: data.get("weightUnit") === "g" ? "g" : "toz",
+      purity,
+    };
+  };
 
   const bind = () => {
     const dialog =
       container.querySelector<HTMLDialogElement>("#investment-dialog")!;
     const form = container.querySelector<HTMLFormElement>("#investment-form")!;
+    const valuationMethod = form.elements.namedItem(
+      "valuationMethod",
+    ) as HTMLSelectElement;
+    const bullionFields =
+      form.querySelector<HTMLFieldSetElement>(".bullion-fields")!;
+    const manualValueField = form.querySelector<HTMLElement>(
+      ".manual-value-field",
+    )!;
+    const currentValueInput = form.elements.namedItem(
+      "currentValue",
+    ) as HTMLInputElement;
+
+    const syncValuationFields = () => {
+      const isBullion = valuationMethod.value !== "manual";
+      bullionFields.hidden = !isBullion;
+      bullionFields.disabled = !isBullion;
+      manualValueField.hidden = isBullion;
+      currentValueInput.disabled = isBullion;
+      bullionFields
+        .querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")
+        .forEach((field) => (field.required = isBullion));
+    };
+
+    const setBullionForm = (holding?: BullionHolding) => {
+      valuationMethod.value = holding?.metal ?? "manual";
+      (form.elements.namedItem("holdingType") as HTMLSelectElement).value =
+        holding?.holdingType ?? "physical";
+      (form.elements.namedItem("quantity") as HTMLInputElement).value = String(
+        holding?.quantity ?? 1,
+      );
+      (form.elements.namedItem("weightPerItem") as HTMLInputElement).value =
+        String(holding?.weightPerItem ?? 1);
+      (form.elements.namedItem("weightUnit") as HTMLSelectElement).value =
+        holding?.weightUnit ?? "toz";
+      (form.elements.namedItem("purity") as HTMLInputElement).value = String(
+        holding?.purity ?? 999.9,
+      );
+      syncValuationFields();
+    };
+
     const openNew = () => {
       form.reset();
       (form.elements.namedItem("id") as HTMLInputElement).value = "";
       (form.elements.namedItem("date") as HTMLInputElement).value = today();
       (form.elements.namedItem("frequency") as HTMLInputElement).value =
         "One time";
+      setBullionForm();
       container.querySelector("#investment-form-title")!.textContent =
         "Add entry";
       container.querySelector("#investment-submit")!.textContent = "Save entry";
       dialog.showModal();
     };
+    valuationMethod.addEventListener("change", syncValuationFields);
     container
       .querySelector("#add-investment")
       ?.addEventListener("click", openNew);
     container
       .querySelector(".investment-close")
       ?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => {
+      if (deferPriceRender) {
+        deferPriceRender = false;
+        render();
+      }
+    });
 
     container
       .querySelectorAll<HTMLButtonElement>(".edit-investment")
@@ -119,12 +244,13 @@ export function mountInvestments(container: HTMLElement): void {
             fromMinorUnits(entry.investedMinor).toFixed(2);
           (form.elements.namedItem("currency") as HTMLSelectElement).value =
             entry.currency;
-          (form.elements.namedItem("currentValue") as HTMLInputElement).value =
+          currentValueInput.value =
             entry.currentValueMinor === null
               ? ""
               : fromMinorUnits(entry.currentValueMinor).toFixed(2);
           (form.elements.namedItem("frequency") as HTMLInputElement).value =
             entry.frequency;
+          setBullionForm(entry.bullion);
           container.querySelector("#investment-form-title")!.textContent =
             "Edit entry";
           container.querySelector("#investment-submit")!.textContent =
@@ -155,11 +281,13 @@ export function mountInvestments(container: HTMLElement): void {
       const currentValueText = String(data.get("currentValue") ?? "").trim();
       const currentValue =
         currentValueText === "" ? null : Number(currentValueText);
+      const bullion = readBullion(data);
       if (
         !Number.isFinite(invested) ||
         invested <= 0 ||
         (currentValue !== null &&
-          (!Number.isFinite(currentValue) || currentValue < 0))
+          (!Number.isFinite(currentValue) || currentValue < 0)) ||
+        (valuationMethod.value !== "manual" && !bullion)
       )
         return;
       const currencyValue = data.get("currency");
@@ -172,12 +300,13 @@ export function mountInvestments(container: HTMLElement): void {
         currency: isCurrency(currencyValue) ? currencyValue : "GBP",
         investedMinor: toMinorUnits(invested),
         currentValueMinor:
-          currentValue === null ? null : toMinorUnits(currentValue),
+          bullion || currentValue === null ? null : toMinorUnits(currentValue),
         frequency: String(data.get("frequency")).trim(),
         scope:
           data.get("scope") === "business"
             ? ("business" as InvestmentScope)
             : ("personal" as InvestmentScope),
+        ...(bullion ? { bullion } : {}),
       };
       entries = existing
         ? entries.map((item) => (item.id === id ? entry : item))
@@ -188,4 +317,12 @@ export function mountInvestments(container: HTMLElement): void {
   };
 
   render();
+  void metalPriceService.load().then((result) => {
+    priceResult = result;
+    priceLoadComplete = true;
+    const dialog =
+      container.querySelector<HTMLDialogElement>("#investment-dialog");
+    if (dialog?.open) deferPriceRender = true;
+    else render();
+  });
 }
