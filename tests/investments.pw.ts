@@ -21,25 +21,29 @@ test("automatically values bullion from spot price and fine weight", async ({
   );
 
   await page.goto("/");
-  await page.getByRole("link", { name: "Investments & savings" }).click();
+  await page.getByRole("link", { name: "Commodities" }).click();
   await expect(page.getByText("Spot prices updated")).toBeVisible();
-  await page.getByRole("button", { name: "+ Add entry" }).click();
+  await page.getByRole("button", { name: "+ Add metal" }).click();
+  await expect(
+    page.locator('#investment-form select[name="valuationMethod"]'),
+  ).toHaveValue("gold");
   await page.getByLabel("Account / provider").fill("Bullion dealer");
   await page.getByLabel("Investment or saving").fill("Two Britannias");
   await page.getByLabel("Category").fill("Gold Physical");
   await page.getByLabel("Amount invested").fill("4000");
-  await page
-    .locator('#investment-form select[name="valuationMethod"]')
-    .selectOption("gold");
   await page.getByLabel("Quantity").fill("2");
   await page.getByLabel("Weight per item").fill("1");
   await page.getByLabel("Purity / fineness").fill("999.9");
-  await page.getByRole("button", { name: "Save entry" }).click();
+  await page.getByLabel("Tax / GST paid").fill("120");
+  await page.getByRole("button", { name: "Save metal" }).click();
 
-  await expect(page.getByText("Est. metal value")).toBeVisible();
+  await expect(page.getByText("CURRENT VALUE")).toBeVisible();
   await expect(page.getByText("£4,499.55").first()).toBeVisible();
-  await expect(page.getByText("+£499.55").first()).toBeVisible();
-  await expect(page.getByText("+12.49%").first()).toBeVisible();
+  await expect(page.getByText("+£499.55 +12.49%")).toBeVisible();
+  await expect(page.getByText("Tax / GST paid").first()).toBeVisible();
+  await expect(page.getByText("£120.00").first()).toBeVisible();
+  await expect(page.getByText("Gold held")).toBeVisible();
+  await expect(page.getByText("62.207 g")).toBeVisible();
   await expect(page.getByText(/gold · 2 × 1 toz · 999.9 fine/)).toBeVisible();
 
   const entryCard = page.getByRole("button", { name: "Edit Two Britannias" });
@@ -51,6 +55,34 @@ test("automatically values bullion from spot price and fine weight", async ({
   page.once("dialog", (confirmation) => confirmation.accept());
   await deleteButton.click();
   await expect(entryCard).toBeHidden();
+});
+
+test("commodities and investments use separate views over the same ledger", async ({
+  page,
+}) => {
+  await page.goto("/#/commodities");
+  await expect(
+    page.getByRole("heading", { name: "Commodities" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "+ Add metal" }).click();
+  await page.getByLabel("Account / provider").fill("Digital vault");
+  await page.getByLabel("Investment or saving").fill("Silver balance");
+  await page.getByLabel("Category").fill("Silver Digital");
+  await page.getByLabel("Amount invested").fill("50");
+  await page
+    .locator('#investment-form select[name="valuationMethod"]')
+    .selectOption("silver");
+  await page.getByLabel("Quantity").fill("5");
+  await page.getByLabel("Weight per item").fill("10");
+  await page
+    .locator("#investment-form")
+    .getByRole("button", { name: "Save metal" })
+    .click();
+  await expect(page.getByText("Silver balance")).toBeVisible();
+  await page.getByRole("link", { name: "Investments & savings" }).click();
+  await expect(page.getByText("Silver balance")).toHaveCount(0);
+  await page.getByRole("link", { name: "Commodities" }).click();
+  await expect(page.getByText("Silver balance")).toBeVisible();
 });
 
 test("date field stays within the investment dialog on mobile", async ({

@@ -17,11 +17,12 @@ const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw new Error("Application root not found");
 
 let loans = localLoanRepository.list();
-type AppModule = "overview" | "debts" | "investments";
+type AppModule = "overview" | "debts" | "investments" | "commodities";
 let activeModule: AppModule = parseModule(window.location.hash);
 
 function parseModule(hash: string): AppModule {
   if (hash === "#/investments") return "investments";
+  if (hash === "#/commodities") return "commodities";
   if (hash === "#/debts") return "debts";
   return "overview";
 }
@@ -39,15 +40,15 @@ function tenure(months: number | null): string {
 }
 
 function render() {
-  const header = `<header class="topbar"><div><img class="brand-icon" src="./debt-eater-icon.png" alt="" /><strong>Finance Tracker</strong></div><nav class="module-nav" aria-label="Finance sections"><a href="#/overview" aria-label="Overview" ${activeModule === "overview" ? 'aria-current="page"' : ""}>Overview</a><a href="#/debts" aria-label="Debt Eater" ${activeModule === "debts" ? 'aria-current="page"' : ""}><span class="nav-label-full">Debt Eater</span><span class="nav-label-short">Debt</span></a><a href="#/investments" aria-label="Investments &amp; savings" ${activeModule === "investments" ? 'aria-current="page"' : ""}><span class="nav-label-full">Investments &amp; savings</span><span class="nav-label-short">Investments</span></a></nav>${activeModule === "debts" ? '<button class="primary" id="add-loan">+ Add debt</button>' : ""}</header>`;
+  const header = `<header class="topbar"><div><img class="brand-icon" src="./debt-eater-icon.png" alt="" /><strong>Finance Tracker</strong></div><nav class="module-nav" aria-label="Finance sections"><a href="#/overview" aria-label="Overview" ${activeModule === "overview" ? 'aria-current="page"' : ""}>Overview</a><a href="#/debts" aria-label="Debt Eater" ${activeModule === "debts" ? 'aria-current="page"' : ""}><span class="nav-label-full">Debt Eater</span><span class="nav-label-short">Debt</span></a><a href="#/investments" aria-label="Investments &amp; savings" ${activeModule === "investments" ? 'aria-current="page"' : ""}><span class="nav-label-full">Investments &amp; savings</span><span class="nav-label-short">Investments</span></a><a href="#/commodities" aria-label="Commodities" ${activeModule === "commodities" ? 'aria-current="page"' : ""}>Commodities</a></nav>${activeModule === "debts" ? '<button class="primary" id="add-loan">+ Add debt</button>' : ""}</header>`;
   if (activeModule === "overview") {
     app!.innerHTML = `${header}${financeOverview()}`;
     return;
   }
-  if (activeModule === "investments") {
+  if (activeModule === "investments" || activeModule === "commodities") {
     app!.innerHTML = `${header}<main id="module-content"></main>`;
     const content = document.querySelector<HTMLElement>("#module-content");
-    if (content) mountInvestments(content);
+    if (content) mountInvestments(content, activeModule);
     return;
   }
 
