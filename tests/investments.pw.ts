@@ -38,7 +38,19 @@ test("automatically values bullion from spot price and fine weight", async ({
 
   await expect(page.getByText("Est. metal value")).toBeVisible();
   await expect(page.getByText("£4,499.55").first()).toBeVisible();
+  await expect(page.getByText("+£499.55").first()).toBeVisible();
+  await expect(page.getByText("+12.49%").first()).toBeVisible();
   await expect(page.getByText(/gold · 2 × 1 toz · 999.9 fine/)).toBeVisible();
+
+  const entryCard = page.getByRole("button", { name: "Edit Two Britannias" });
+  await entryCard.focus();
+  await entryCard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Edit entry" })).toBeVisible();
+  const deleteButton = page.getByRole("button", { name: "Delete entry" });
+  await expect(deleteButton).toBeVisible();
+  page.once("dialog", (confirmation) => confirmation.accept());
+  await deleteButton.click();
+  await expect(entryCard).toBeHidden();
 });
 
 test("date field stays within the investment dialog on mobile", async ({

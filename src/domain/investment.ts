@@ -41,6 +41,7 @@ export interface CurrencyInvestmentSummary {
   valuedEntryCount: number;
   currentValueMinor: number;
   gainMinor: number;
+  gainPercent: number;
 }
 
 export function summarizeInvestments(
@@ -56,6 +57,15 @@ export function summarizeInvestments(
     const valueFor = (entry: InvestmentEntry) =>
       valuesById.get(entry.id) ?? entry.currentValueMinor;
     const valued = matching.filter((entry) => valueFor(entry) !== null);
+    const valuedInvestedMinor = valued.reduce(
+      (sum, entry) => sum + entry.investedMinor,
+      0,
+    );
+    const currentValueMinor = valued.reduce(
+      (sum, entry) => sum + (valueFor(entry) ?? 0),
+      0,
+    );
+    const gainMinor = currentValueMinor - valuedInvestedMinor;
     return {
       currency,
       entryCount: matching.length,
@@ -64,14 +74,10 @@ export function summarizeInvestments(
         0,
       ),
       valuedEntryCount: valued.length,
-      currentValueMinor: valued.reduce(
-        (sum, entry) => sum + (valueFor(entry) ?? 0),
-        0,
-      ),
-      gainMinor: valued.reduce(
-        (sum, entry) => sum + (valueFor(entry) ?? 0) - entry.investedMinor,
-        0,
-      ),
+      currentValueMinor,
+      gainMinor,
+      gainPercent:
+        valuedInvestedMinor === 0 ? 0 : (gainMinor / valuedInvestedMinor) * 100,
     };
   });
 }

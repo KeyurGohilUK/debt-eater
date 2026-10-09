@@ -23,6 +23,13 @@ const uid = () => crypto.randomUUID();
 const today = () => new Date().toISOString().slice(0, 10);
 const formatNumber = (value: number) =>
   new Intl.NumberFormat("en-GB", { maximumFractionDigits: 3 }).format(value);
+const formatGainPercent = (value: number) =>
+  new Intl.NumberFormat("en-GB", {
+    style: "percent",
+    signDisplay: "exceptZero",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value / 100);
 
 export function mountInvestments(container: HTMLElement): void {
   let entries = localInvestmentRepository.list();
@@ -57,11 +64,14 @@ export function mountInvestments(container: HTMLElement): void {
     const bullionMeta = entry.bullion
       ? `<span>·</span> ${escapeHtml(bullionDescription(entry.bullion))}`
       : "";
-    return `<article class="investment-card">
+    const gainMinor =
+      currentValue === null ? null : currentValue - entry.investedMinor;
+    const gainPercent =
+      gainMinor === null ? null : (gainMinor / entry.investedMinor) * 100;
+    return `<article class="investment-card edit-investment" data-id="${escapeHtml(entry.id)}" role="button" tabindex="0" aria-label="Edit ${escapeHtml(entry.asset)}">
       <div class="investment-date">${escapeHtml(new Date(`${entry.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}</div>
       <div class="investment-card-main"><div class="investment-card-title"><h3>${escapeHtml(entry.asset)}</h3><span class="investment-category">${escapeHtml(entry.category)}</span></div><div class="investment-meta">${escapeHtml(entry.provider)} <span>·</span> ${entry.scope} <span>·</span> ${escapeHtml(entry.frequency)} ${bullionMeta}</div></div>
-      <div class="investment-amounts"><div><span>Invested</span><strong>${formatMoney(entry.investedMinor, entry.currency)}</strong></div><div><span>${valueLabel}</span><strong>${currentValue === null ? "—" : formatMoney(currentValue, entry.currency)}</strong></div></div>
-      <div class="investment-actions"><button class="secondary edit-investment" data-id="${escapeHtml(entry.id)}">Edit</button><button class="secondary delete-investment" data-id="${escapeHtml(entry.id)}" aria-label="Delete ${escapeHtml(entry.asset)}">Delete</button></div>
+      <div class="investment-amounts"><div><span>Invested</span><strong>${formatMoney(entry.investedMinor, entry.currency)}</strong></div><div><span>${valueLabel}</span><strong>${currentValue === null ? "—" : formatMoney(currentValue, entry.currency)}</strong></div>${gainMinor === null || gainPercent === null ? "" : `<div class="investment-entry-change ${gainMinor >= 0 ? "positive" : "negative"}"><span>Gain / loss</span><strong>${gainMinor > 0 ? "+" : ""}${formatMoney(gainMinor, entry.currency)} <small>${formatGainPercent(gainPercent)}</small></strong></div>`}</div>
     </article>`;
   };
 
@@ -87,7 +97,7 @@ export function mountInvestments(container: HTMLElement): void {
             <div class="investment-total-head"><span>${summary.currency}</span><span>${summary.entryCount} entr${summary.entryCount === 1 ? "y" : "ies"}</span></div>
             <div class="investment-total-row"><span>Invested</span><strong>${formatMoney(summary.investedMinor, summary.currency)}</strong></div>
             <div class="investment-total-row"><span>Current value <small>(${summary.valuedEntryCount} valued)</small></span><strong>${summary.valuedEntryCount ? formatMoney(summary.currentValueMinor, summary.currency) : "—"}</strong></div>
-            ${summary.valuedEntryCount ? `<div class="investment-change ${summary.gainMinor >= 0 ? "positive" : "negative"}"><span>Change on valued entries</span><strong>${summary.gainMinor > 0 ? "+" : ""}${formatMoney(summary.gainMinor, summary.currency)}</strong></div>` : ""}
+            ${summary.valuedEntryCount ? `<div class="investment-change ${summary.gainMinor >= 0 ? "positive" : "negative"}"><span>Change on valued entries</span><strong>${summary.gainMinor > 0 ? "+" : ""}${formatMoney(summary.gainMinor, summary.currency)} <small>${formatGainPercent(summary.gainPercent)}</small></strong></div>` : ""}
           </article>`,
                   )
                   .join("")
@@ -120,7 +130,7 @@ export function mountInvestments(container: HTMLElement): void {
             <p class="form-note">Estimated metal value uses fine weight and the latest cached spot price. Dealer premiums, fees, VAT and resale spreads are excluded.</p>
           </fieldset>
           <p class="form-note">Totals remain separate by currency. Manual values are used for non-bullion assets.</p>
-          <button class="primary full" id="investment-submit">Save entry</button>
+          <div class="investment-dialog-actions"><button type="button" class="secondary danger" id="delete-investment-dialog" hidden>Delete entry</button><button class="primary" id="investment-submit">Save entry</button></div>
         </form></dialog>
       </section>`;
     bind();
@@ -168,6 +178,9 @@ export function mountInvestments(container: HTMLElement): void {
     const currentValueInput = form.elements.namedItem(
       "currentValue",
     ) as HTMLInputElement;
+    const deleteButton = form.querySelector<HTMLButtonElement>(
+      "#delete-investment-dialog",
+    )!;
 
     const syncValuationFields = () => {
       const isBullion = valuationMethod.value !== "manual";
@@ -207,6 +220,7 @@ export function mountInvestments(container: HTMLElement): void {
       container.querySelector("#investment-form-title")!.textContent =
         "Add entry";
       container.querySelector("#investment-submit")!.textContent = "Save entry";
+      deleteButton.hidden = true;
       dialog.showModal();
     };
     valuationMethod.addEventListener("change", syncValuationFields);
@@ -223,54 +237,60 @@ export function mountInvestments(container: HTMLElement): void {
       }
     });
 
-    container
-      .querySelectorAll<HTMLButtonElement>(".edit-investment")
-      .forEach((button) =>
-        button.addEventListener("click", () => {
-          const entry = entries.find(({ id }) => id === button.dataset.id);
-          if (!entry) return;
-          (form.elements.namedItem("id") as HTMLInputElement).value = entry.id;
-          (form.elements.namedItem("date") as HTMLInputElement).value =
-            entry.date;
-          (form.elements.namedItem("provider") as HTMLInputElement).value =
-            entry.provider;
-          (form.elements.namedItem("asset") as HTMLInputElement).value =
-            entry.asset;
-          (form.elements.namedItem("category") as HTMLInputElement).value =
-            entry.category;
-          (form.elements.namedItem("scope") as HTMLSelectElement).value =
-            entry.scope;
-          (form.elements.namedItem("invested") as HTMLInputElement).value =
-            fromMinorUnits(entry.investedMinor).toFixed(2);
-          (form.elements.namedItem("currency") as HTMLSelectElement).value =
-            entry.currency;
-          currentValueInput.value =
-            entry.currentValueMinor === null
-              ? ""
-              : fromMinorUnits(entry.currentValueMinor).toFixed(2);
-          (form.elements.namedItem("frequency") as HTMLInputElement).value =
-            entry.frequency;
-          setBullionForm(entry.bullion);
-          container.querySelector("#investment-form-title")!.textContent =
-            "Edit entry";
-          container.querySelector("#investment-submit")!.textContent =
-            "Save changes";
-          dialog.showModal();
-        }),
-      );
+    const openEdit = (entry: InvestmentEntry) => {
+      (form.elements.namedItem("id") as HTMLInputElement).value = entry.id;
+      (form.elements.namedItem("date") as HTMLInputElement).value = entry.date;
+      (form.elements.namedItem("provider") as HTMLInputElement).value =
+        entry.provider;
+      (form.elements.namedItem("asset") as HTMLInputElement).value =
+        entry.asset;
+      (form.elements.namedItem("category") as HTMLInputElement).value =
+        entry.category;
+      (form.elements.namedItem("scope") as HTMLSelectElement).value =
+        entry.scope;
+      (form.elements.namedItem("invested") as HTMLInputElement).value =
+        fromMinorUnits(entry.investedMinor).toFixed(2);
+      (form.elements.namedItem("currency") as HTMLSelectElement).value =
+        entry.currency;
+      currentValueInput.value =
+        entry.currentValueMinor === null
+          ? ""
+          : fromMinorUnits(entry.currentValueMinor).toFixed(2);
+      (form.elements.namedItem("frequency") as HTMLInputElement).value =
+        entry.frequency;
+      setBullionForm(entry.bullion);
+      container.querySelector("#investment-form-title")!.textContent =
+        "Edit entry";
+      container.querySelector("#investment-submit")!.textContent =
+        "Save changes";
+      deleteButton.hidden = false;
+      dialog.showModal();
+    };
 
     container
-      .querySelectorAll<HTMLButtonElement>(".delete-investment")
-      .forEach((button) =>
-        button.addEventListener("click", () => {
-          const entry = entries.find(({ id }) => id === button.dataset.id);
-          if (!entry || !window.confirm(`Delete “${entry.asset}” entry?`))
-            return;
-          entries = entries.filter(({ id }) => id !== entry.id);
-          localInvestmentRepository.save(entries);
-          render();
-        }),
-      );
+      .querySelectorAll<HTMLElement>(".edit-investment")
+      .forEach((card) => {
+        const edit = () => {
+          const entry = entries.find(({ id }) => id === card.dataset.id);
+          if (entry) openEdit(entry);
+        };
+        card.addEventListener("click", edit);
+        card.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          edit();
+        });
+      });
+
+    deleteButton.addEventListener("click", () => {
+      const id = (form.elements.namedItem("id") as HTMLInputElement).value;
+      const entry = entries.find((item) => item.id === id);
+      if (!entry || !window.confirm(`Delete “${entry.asset}” entry?`)) return;
+      entries = entries.filter((item) => item.id !== id);
+      localInvestmentRepository.save(entries);
+      dialog.close();
+      render();
+    });
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
