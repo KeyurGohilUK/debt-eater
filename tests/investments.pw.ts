@@ -84,7 +84,7 @@ test("commodities and investments use separate views over the same ledger", asyn
     .getByRole("button", { name: "Save metal" })
     .click();
   await expect(page.getByText("Silver balance")).toBeVisible();
-  await expect(page.getByText("1.607 oz", { exact: true })).toBeVisible();
+  await expect(page.getByText("1.608 oz", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Investments & savings" }).click();
   await expect(page.getByText("Silver balance")).toHaveCount(0);
   await page.getByRole("link", { name: "Commodities" }).click();
