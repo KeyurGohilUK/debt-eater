@@ -653,6 +653,46 @@ button:focus-visible {
   color: #667085;
   font-weight: 400;
 }
+.metal-price-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -10px 0 20px;
+  color: #475467;
+  font-size: 11px;
+}
+.price-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #12b76a;
+}
+.price-dot.loading {
+  background: #98a2b3;
+}
+.metal-price-status.warning .price-dot {
+  background: #f79009;
+}
+.bullion-fields {
+  margin: 0 0 16px;
+  padding: 16px 16px 0;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+.bullion-fields[hidden] {
+  display: none;
+}
+.bullion-fields legend {
+  padding: 0 6px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+.bullion-weight-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 @media (max-width: 820px) {
   .investment-card {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -696,6 +736,9 @@ button:focus-visible {
   }
   #investment-dialog form {
     padding: 18px;
+  }
+  .bullion-weight-grid {
+    grid-template-columns: 1fr;
   }
 }
 
