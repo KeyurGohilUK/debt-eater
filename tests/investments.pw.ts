@@ -39,7 +39,9 @@ test("automatically values bullion from spot price and fine weight", async ({
 
   await expect(page.getByText("CURRENT VALUE", { exact: true })).toBeVisible();
   await expect(page.getByText("£4,499.55").first()).toBeVisible();
-  await expect(page.getByText("+£499.55 +12.49%")).toBeVisible();
+  await expect(
+    page.getByLabel("Commodity portfolio totals").getByText("+£499.55 +12.49%"),
+  ).toBeVisible();
   await expect(page.getByText("Tax / GST paid").first()).toBeVisible();
   await expect(page.getByText("£120.00").first()).toBeVisible();
   await expect(page.getByText("Gold held")).toBeVisible();
@@ -121,11 +123,13 @@ test("records investment entries and keeps currency totals separate", async ({
   await expect(
     page.getByRole("heading", { name: "Investments & savings" }),
   ).toBeVisible();
-  await expect(
-    page.locator(
-      '#investment-form select[name="valuationMethod"] option[value="gold"]',
-    ),
-  ).toBeDisabled();
+  expect(
+    await page
+      .locator(
+        '#investment-form select[name="valuationMethod"] option[value="gold"]',
+      )
+      .evaluate((option) => (option as HTMLOptionElement).disabled),
+  ).toBe(true);
 
   await page.getByRole("button", { name: "+ Add entry" }).click();
   await page.getByLabel("Account / provider").fill("Trading 212");
