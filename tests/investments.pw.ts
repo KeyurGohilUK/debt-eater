@@ -28,7 +28,9 @@ test("automatically values bullion from spot price and fine weight", async ({
   await page.getByLabel("Investment or saving").fill("Two Britannias");
   await page.getByLabel("Category").fill("Gold Physical");
   await page.getByLabel("Amount invested").fill("4000");
-  await page.getByLabel("Valuation").selectOption("gold");
+  await page
+    .locator('#investment-form select[name="valuationMethod"]')
+    .selectOption("gold");
   await page.getByLabel("Quantity").fill("2");
   await page.getByLabel("Weight per item").fill("1");
   await page.getByLabel("Purity / fineness").fill("999.9");
