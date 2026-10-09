@@ -50,6 +50,12 @@ test("automatically values bullion from spot price and fine weight", async ({
   await expect(page.getByText("Gold held")).toBeVisible();
   await expect(page.getByText("2 oz", { exact: true })).toBeVisible();
   await expect(page.getByText(/gold · 2 × 1 toz · 999.9 fine/)).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: /Gold Britannia bullion coin/ }),
+  ).toHaveAttribute(
+    "src",
+    /royalmint\.com\/globalassets\/.+gold-1oz-reverse-capsule/,
+  );
 
   const entryCard = page.getByRole("button", { name: "Edit Two Britannias" });
   await entryCard.focus();
@@ -86,6 +92,12 @@ test("commodities and investments use separate views over the same ledger", asyn
     .click();
   await expect(page.getByText("Silver balance")).toBeVisible();
   await expect(page.getByText("1.608 oz", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: /Silver Britannia bullion coin/ }),
+  ).toHaveAttribute(
+    "src",
+    /royalmint\.com\/globalassets\/.+silver-1oz-reverse-capsule/,
+  );
   await page.getByRole("link", { name: "Investments & savings" }).click();
   await expect(page.getByText("Silver balance")).toHaveCount(0);
   await page.getByRole("link", { name: "Commodities" }).click();
