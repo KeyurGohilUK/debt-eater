@@ -1175,3 +1175,52 @@ button:focus-visible {
     font-size: 20px;
   }
 }
+
+.commodity-weights small {
+  display: block;
+  margin-top: 3px;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 500;
+}
+.commodity-performance {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+  padding: 20px 10px;
+  border: 1px solid #d7e4e3;
+  border-radius: 16px;
+  background: #fff;
+}
+.commodity-performance > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+}
+.commodity-performance > div + div {
+  border-left: 1px solid #e4e7ec;
+}
+.commodity-performance span {
+  color: #755c36;
+  font-size: 12px;
+}
+.commodity-performance strong {
+  color: #4b3827;
+  font-size: clamp(16px, 3vw, 21px);
+  overflow-wrap: anywhere;
+}
+.commodity-performance .commodity-gain.positive strong {
+  color: #027a48;
+}
+.commodity-performance .commodity-gain.negative strong {
+  color: #b42318;
+}
+.commodity-performance strong small {
+  display: inline-block;
+  font-size: 12px;
+  white-space: nowrap;
+}

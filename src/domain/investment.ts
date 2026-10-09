@@ -28,7 +28,6 @@ export interface InvestmentEntry {
   category: string;
   currency: Currency;
   investedMinor: number;
-  taxMinor?: number;
   currentValueMinor: number | null;
   frequency: string;
   scope: InvestmentScope;
@@ -43,7 +42,6 @@ export interface CurrencyInvestmentSummary {
   currentValueMinor: number;
   gainMinor: number;
   gainPercent: number;
-  taxMinor: number;
 }
 
 export function summarizeInvestments(
@@ -80,34 +78,34 @@ export function summarizeInvestments(
       gainMinor,
       gainPercent:
         valuedInvestedMinor === 0 ? 0 : (gainMinor / valuedInvestedMinor) * 100,
-      taxMinor: matching.reduce((sum, entry) => sum + (entry.taxMinor ?? 0), 0),
     };
   });
 }
 
 const GRAMS_PER_TROY_OUNCE = 31.1034768;
 
-export interface BullionQuantitySummary {
-  goldGrams: number;
-  silverGrams: number;
+export interface BullionTroyOunceSummary {
+  goldTroyOunces: number;
+  silverTroyOunces: number;
 }
 
-export function summarizeBullionQuantities(
+export function summarizeBullionTroyOunces(
   entries: readonly InvestmentEntry[],
-): BullionQuantitySummary {
+): BullionTroyOunceSummary {
   return entries.reduce(
     (summary, entry) => {
       if (!entry.bullion) return summary;
-      const gramsPerItem =
+      const troyOuncesPerItem =
         entry.bullion.weightUnit === "toz"
-          ? entry.bullion.weightPerItem * GRAMS_PER_TROY_OUNCE
-          : entry.bullion.weightPerItem;
-      const totalGrams = entry.bullion.quantity * gramsPerItem;
-      if (entry.bullion.metal === "gold") summary.goldGrams += totalGrams;
-      else summary.silverGrams += totalGrams;
+          ? entry.bullion.weightPerItem
+          : entry.bullion.weightPerItem / GRAMS_PER_TROY_OUNCE;
+      const totalTroyOunces = entry.bullion.quantity * troyOuncesPerItem;
+      if (entry.bullion.metal === "gold")
+        summary.goldTroyOunces += totalTroyOunces;
+      else summary.silverTroyOunces += totalTroyOunces;
       return summary;
     },
-    { goldGrams: 0, silverGrams: 0 },
+    { goldTroyOunces: 0, silverTroyOunces: 0 },
   );
 }
 
@@ -182,8 +180,6 @@ export function isValidInvestmentEntry(
     isCurrency(entry.currency) &&
     Number.isSafeInteger(entry.investedMinor) &&
     (entry.investedMinor ?? -1) > 0 &&
-    (entry.taxMinor === undefined ||
-      (Number.isSafeInteger(entry.taxMinor) && entry.taxMinor >= 0)) &&
     (entry.currentValueMinor === null ||
       (Number.isSafeInteger(entry.currentValueMinor) &&
         (entry.currentValueMinor ?? -1) >= 0)) &&

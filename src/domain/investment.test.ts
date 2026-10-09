@@ -3,7 +3,7 @@ import {
   bullionValueMinor,
   isValidInvestmentEntry,
   resolveInvestmentValues,
-  summarizeBullionQuantities,
+  summarizeBullionTroyOunces,
   summarizeInvestments,
 } from "./investment";
 import type { InvestmentEntry } from "./investment";
@@ -44,7 +44,6 @@ describe("investment summaries", () => {
         currentValueMinor: 12_500,
         gainMinor: 2_500,
         gainPercent: 25,
-        taxMinor: 0,
       },
       {
         currency: "EUR",
@@ -54,15 +53,12 @@ describe("investment summaries", () => {
         currentValueMinor: 2_500,
         gainMinor: 500,
         gainPercent: 25,
-        taxMinor: 0,
       },
     ]);
   });
 
   it("validates persisted records at the storage boundary", () => {
     expect(isValidInvestmentEntry(entry())).toBe(true);
-    expect(isValidInvestmentEntry(entry({ taxMinor: 1234 }))).toBe(true);
-    expect(isValidInvestmentEntry(entry({ taxMinor: -1 }))).toBe(false);
     expect(isValidInvestmentEntry({ ...entry(), investedMinor: 1.5 })).toBe(
       false,
     );
@@ -135,31 +131,31 @@ describe("investment summaries", () => {
 });
 
 describe("commodity quantities", () => {
-  it("totals gold and silver in grams across gram and troy-ounce entries", () => {
-    expect(
-      summarizeBullionQuantities([
-        entry({
-          bullion: {
-            metal: "gold",
-            holdingType: "physical",
-            quantity: 2,
-            weightPerItem: 1,
-            weightUnit: "toz",
-            purity: 999.9,
-          },
-        }),
-        entry({
-          id: "2",
-          bullion: {
-            metal: "silver",
-            holdingType: "digital",
-            quantity: 3,
-            weightPerItem: 10,
-            weightUnit: "g",
-            purity: 999,
-          },
-        }),
-      ]),
-    ).toEqual({ goldGrams: 62.2069536, silverGrams: 30 });
+  it("totals physical and digital gold and silver in troy ounces", () => {
+    const totals = summarizeBullionTroyOunces([
+      entry({
+        bullion: {
+          metal: "gold",
+          holdingType: "physical",
+          quantity: 2,
+          weightPerItem: 1,
+          weightUnit: "toz",
+          purity: 999.9,
+        },
+      }),
+      entry({
+        id: "2",
+        bullion: {
+          metal: "silver",
+          holdingType: "digital",
+          quantity: 3,
+          weightPerItem: 10,
+          weightUnit: "g",
+          purity: 999,
+        },
+      }),
+    ]);
+    expect(totals.goldTroyOunces).toBe(2);
+    expect(totals.silverTroyOunces).toBeCloseTo(30 / 31.1034768, 10);
   });
 });

@@ -34,7 +34,6 @@ test("automatically values bullion from spot price and fine weight", async ({
   await page.getByLabel("Quantity").fill("2");
   await page.getByLabel("Weight per item").fill("1");
   await page.getByLabel("Purity / fineness").fill("999.9");
-  await page.getByLabel("Tax / GST paid").fill("120");
   await page.getByRole("button", { name: "Save metal" }).click();
 
   await expect(page.getByText("CURRENT VALUE", { exact: true })).toBeVisible();
@@ -42,10 +41,14 @@ test("automatically values bullion from spot price and fine weight", async ({
   await expect(
     page.getByLabel("Commodity portfolio totals").getByText("+£499.55 +12.49%"),
   ).toBeVisible();
-  await expect(page.getByText("Tax / GST paid").first()).toBeVisible();
-  await expect(page.getByText("£120.00").first()).toBeVisible();
+  await expect(
+    page.getByLabel("Commodity portfolio totals").getByText("Invested"),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Commodity portfolio totals").getByText("Gain / loss"),
+  ).toBeVisible();
   await expect(page.getByText("Gold held")).toBeVisible();
-  await expect(page.getByText("62.207 g")).toBeVisible();
+  await expect(page.getByText("2 oz", { exact: true })).toBeVisible();
   await expect(page.getByText(/gold · 2 × 1 toz · 999.9 fine/)).toBeVisible();
 
   const entryCard = page.getByRole("button", { name: "Edit Two Britannias" });
@@ -81,6 +84,7 @@ test("commodities and investments use separate views over the same ledger", asyn
     .getByRole("button", { name: "Save metal" })
     .click();
   await expect(page.getByText("Silver balance")).toBeVisible();
+  await expect(page.getByText("1.607 oz", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Investments & savings" }).click();
   await expect(page.getByText("Silver balance")).toHaveCount(0);
   await page.getByRole("link", { name: "Commodities" }).click();
