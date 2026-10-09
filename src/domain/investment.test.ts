@@ -42,6 +42,7 @@ describe("investment summaries", () => {
         valuedEntryCount: 1,
         currentValueMinor: 12_500,
         gainMinor: 2_500,
+        gainPercent: 25,
       },
       {
         currency: "EUR",
@@ -50,6 +51,7 @@ describe("investment summaries", () => {
         valuedEntryCount: 1,
         currentValueMinor: 2_500,
         gainMinor: 500,
+        gainPercent: 25,
       },
     ]);
   });
@@ -122,6 +124,7 @@ describe("investment summaries", () => {
       valuedEntryCount: 1,
       currentValueMinor: 13_000,
       gainMinor: 3_000,
+      gainPercent: 30,
     });
   });
 });
