@@ -6,6 +6,7 @@ import {
 } from "../../domain/money";
 import {
   resolveInvestmentValues,
+  summarizeBullionQuantities,
   summarizeInvestments,
   type BullionHolding,
   type BullionMetal,
@@ -31,7 +32,12 @@ const formatGainPercent = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value / 100);
 
-export function mountInvestments(container: HTMLElement): void {
+export type PortfolioMode = "investments" | "commodities";
+
+export function mountInvestments(
+  container: HTMLElement,
+  mode: PortfolioMode = "investments",
+): void {
   let entries = localInvestmentRepository.list();
   let priceResult: MetalPriceResult | null = null;
   let priceLoadComplete = false;
@@ -80,23 +86,31 @@ export function mountInvestments(container: HTMLElement): void {
       entries,
       priceResult?.snapshot ?? null,
     );
-    const summaries = summarizeInvestments(entries, valuesById);
+    const visibleEntries = entries.filter((entry) =>
+      mode === "commodities" ? Boolean(entry.bullion) : !entry.bullion,
+    );
+    const isCommodities = mode === "commodities";
+    const summaries = summarizeInvestments(visibleEntries, valuesById);
+    const weights = summarizeBullionQuantities(visibleEntries);
     container.innerHTML = `
-      <section class="investment-page" aria-labelledby="investments-title">
+      <section class="investment-page ${isCommodities ? "commodity-page" : ""}" aria-labelledby="investments-title">
         <div class="investment-heading">
-          <div><p class="eyebrow">PORTFOLIO</p><h1 id="investments-title">Investments &amp; savings</h1><p class="investment-subtitle">A clear view of what you’ve put aside, across accounts and currencies.</p></div>
-          <button class="primary" id="add-investment">+ Add entry</button>
+          <div><p class="eyebrow">${isCommodities ? "PRECIOUS METALS" : "PORTFOLIO"}</p><h1 id="investments-title">${isCommodities ? "Commodities" : "Investments &amp; savings"}</h1><p class="investment-subtitle">${isCommodities ? "Gold and silver holdings, valued against current spot prices." : "A clear view of what you’ve put aside, across accounts and currencies."}</p></div>
+          <button class="primary" id="add-investment">${isCommodities ? "+ Add metal" : "+ Add entry"}</button>
         </div>
-        ${metalPriceStatus()}
-        <div class="investment-summary" aria-label="Investment totals">
+        ${isCommodities ? metalPriceStatus() : ""}
+        ${isCommodities ? `<section class="commodity-weights" aria-label="Metal quantities"><article><span>Gold held</span><strong>${formatNumber(weights.goldGrams)} g</strong></article><article><span>Silver held</span><strong>${formatNumber(weights.silverGrams)} g</strong></article></section>` : ""}
+        <div class="investment-summary ${isCommodities ? "commodity-summary" : ""}" aria-label="${isCommodities ? "Commodity portfolio totals" : "Investment totals"}">
           ${
             summaries.length
               ? summaries
                   .map(
                     (summary) => `<article class="investment-total">
             <div class="investment-total-head"><span>${summary.currency}</span><span>${summary.entryCount} entr${summary.entryCount === 1 ? "y" : "ies"}</span></div>
+            ${isCommodities ? `<div class="commodity-current-label">CURRENT VALUE</div><strong class="commodity-current-value">${summary.valuedEntryCount ? formatMoney(summary.currentValueMinor, summary.currency) : "—"}</strong>` : ""}
             <div class="investment-total-row"><span>Invested</span><strong>${formatMoney(summary.investedMinor, summary.currency)}</strong></div>
-            <div class="investment-total-row"><span>Current value <small>(${summary.valuedEntryCount} valued)</small></span><strong>${summary.valuedEntryCount ? formatMoney(summary.currentValueMinor, summary.currency) : "—"}</strong></div>
+            ${isCommodities ? `<div class="investment-total-row"><span>Tax / GST paid</span><strong>${formatMoney(summary.taxMinor, summary.currency)}</strong></div>` : ""}
+            ${!isCommodities ? `<div class="investment-total-row"><span>Current value <small>(${summary.valuedEntryCount} valued)</small></span><strong>${summary.valuedEntryCount ? formatMoney(summary.currentValueMinor, summary.currency) : "—"}</strong></div>` : ""}
             ${summary.valuedEntryCount ? `<div class="investment-change ${summary.gainMinor >= 0 ? "positive" : "negative"}"><span>Change on valued entries</span><strong>${summary.gainMinor > 0 ? "+" : ""}${formatMoney(summary.gainMinor, summary.currency)} <small>${formatGainPercent(summary.gainPercent)}</small></strong></div>` : ""}
           </article>`,
                   )
@@ -105,9 +119,9 @@ export function mountInvestments(container: HTMLElement): void {
           }
         </div>
         ${
-          entries.length
-            ? `<section class="investment-ledger" aria-labelledby="ledger-title"><div class="section-title"><div><p class="eyebrow">ACTIVITY</p><h2 id="ledger-title">Your entries</h2></div><span>${entries.length} total</span></div><div class="investment-list">${[
-                ...entries,
+          visibleEntries.length
+            ? `<section class="investment-ledger" aria-labelledby="ledger-title"><div class="section-title"><div><p class="eyebrow">${isCommodities ? "HOLDINGS" : "ACTIVITY"}</p><h2 id="ledger-title">${isCommodities ? "Your metals" : "Your entries"}</h2></div><span>${visibleEntries.length} total</span></div><div class="investment-list">${[
+                ...visibleEntries,
               ]
                 .sort((a, b) => b.date.localeCompare(a.date))
                 .map((entry) => investmentCard(entry, valuesById))
@@ -116,7 +130,7 @@ export function mountInvestments(container: HTMLElement): void {
         }
         <dialog id="investment-dialog"><form id="investment-form">
           <input type="hidden" name="id">
-          <div class="dialog-head"><div><p class="eyebrow">INVESTMENT OR SAVING</p><h2 id="investment-form-title">Add entry</h2></div><button type="button" class="icon investment-close" aria-label="Close">×</button></div>
+          <div class="dialog-head"><div><p class="eyebrow" id="investment-form-eyebrow">INVESTMENT OR SAVING</p><h2 id="investment-form-title">Add entry</h2></div><button type="button" class="icon investment-close" aria-label="Close">×</button></div>
           <div class="form-grid"><label>Date<input name="date" type="date" required></label><label>Account / provider<input name="provider" maxlength="80" placeholder="Trading 212" required></label></div>
           <label>Investment or saving<input name="asset" maxlength="100" placeholder="Global index fund" required></label>
           <div class="form-grid"><label>Category<input name="category" list="investment-categories" maxlength="60" placeholder="Stocks ISA UK" required><datalist id="investment-categories"><option>Stock UK</option><option>Stocks ISA UK</option><option>SIP India</option><option>Cash ISA UK</option><option>Gold Physical</option><option>Gold Digital</option><option>Silver Physical</option><option>Silver Digital</option><option>Stock India</option></datalist></label><label>Owner<select name="scope"><option value="personal">Personal</option><option value="business">Business</option></select></label></div>
@@ -127,6 +141,7 @@ export function mountInvestments(container: HTMLElement): void {
             <legend>Bullion details</legend>
             <div class="form-grid"><label>Holding type<select name="holdingType"><option value="physical">Physical</option><option value="digital">Digital</option></select></label><label>Quantity<input name="quantity" type="number" min="0.000001" step="any" inputmode="decimal" value="1"></label></div>
             <div class="form-grid bullion-weight-grid"><label>Weight per item<input name="weightPerItem" type="number" min="0.000001" step="any" inputmode="decimal" value="1"></label><label>Weight unit<select name="weightUnit"><option value="toz">Troy ounce</option><option value="g">Gram</option></select></label><label>Purity / fineness<input name="purity" type="number" min="1" max="1000" step="0.1" inputmode="decimal" value="999.9"></label></div>
+            <label class="commodity-tax-field" hidden>Tax / GST paid <small>Optional; record the amount charged on this purchase.</small><input name="taxPaid" type="number" min="0" step="0.01" inputmode="decimal" value="0" disabled></label>
             <p class="form-note">Estimated metal value uses fine weight and the latest cached spot price. Dealer premiums, fees, VAT and resale spreads are excluded.</p>
           </fieldset>
           <p class="form-note">Totals remain separate by currency. Manual values are used for non-bullion assets.</p>
@@ -170,6 +185,11 @@ export function mountInvestments(container: HTMLElement): void {
     const valuationMethod = form.elements.namedItem(
       "valuationMethod",
     ) as HTMLSelectElement;
+    valuationMethod
+      .querySelectorAll<HTMLOptionElement>(
+        'option[value="gold"], option[value="silver"]',
+      )
+      .forEach((option) => (option.disabled = mode !== "commodities"));
     const bullionFields =
       form.querySelector<HTMLFieldSetElement>(".bullion-fields")!;
     const manualValueField = form.querySelector<HTMLElement>(
@@ -188,6 +208,10 @@ export function mountInvestments(container: HTMLElement): void {
       bullionFields.disabled = !isBullion;
       manualValueField.hidden = isBullion;
       currentValueInput.disabled = isBullion;
+      const taxField = form.querySelector<HTMLElement>(".commodity-tax-field")!;
+      const taxInput = form.elements.namedItem("taxPaid") as HTMLInputElement;
+      taxField.hidden = !isBullion;
+      taxInput.disabled = !isBullion;
       bullionFields
         .querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select")
         .forEach((field) => (field.required = isBullion));
@@ -217,9 +241,21 @@ export function mountInvestments(container: HTMLElement): void {
       (form.elements.namedItem("frequency") as HTMLInputElement).value =
         "One time";
       setBullionForm();
+      if (mode === "commodities") {
+        valuationMethod.value = "gold";
+        (form.elements.namedItem("category") as HTMLInputElement).value =
+          "Gold Physical";
+        (form.elements.namedItem("asset") as HTMLInputElement).value =
+          "Gold holding";
+        syncValuationFields();
+      }
+      (form.elements.namedItem("taxPaid") as HTMLInputElement).value = "0";
+      container.querySelector("#investment-form-eyebrow")!.textContent =
+        mode === "commodities" ? "PRECIOUS METAL" : "INVESTMENT OR SAVING";
       container.querySelector("#investment-form-title")!.textContent =
         "Add entry";
-      container.querySelector("#investment-submit")!.textContent = "Save entry";
+      container.querySelector("#investment-submit")!.textContent =
+        mode === "commodities" ? "Save metal" : "Save entry";
       deleteButton.hidden = true;
       dialog.showModal();
     };
@@ -259,6 +295,10 @@ export function mountInvestments(container: HTMLElement): void {
       (form.elements.namedItem("frequency") as HTMLInputElement).value =
         entry.frequency;
       setBullionForm(entry.bullion);
+      (form.elements.namedItem("taxPaid") as HTMLInputElement).value =
+        fromMinorUnits(entry.taxMinor ?? 0).toFixed(2);
+      container.querySelector("#investment-form-eyebrow")!.textContent =
+        entry.bullion ? "PRECIOUS METAL" : "INVESTMENT OR SAVING";
       container.querySelector("#investment-form-title")!.textContent =
         "Edit entry";
       container.querySelector("#investment-submit")!.textContent =
@@ -302,12 +342,15 @@ export function mountInvestments(container: HTMLElement): void {
       const currentValue =
         currentValueText === "" ? null : Number(currentValueText);
       const bullion = readBullion(data);
+      const taxPaid = bullion ? Number(data.get("taxPaid") ?? 0) : 0;
       if (
         !Number.isFinite(invested) ||
         invested <= 0 ||
         (currentValue !== null &&
           (!Number.isFinite(currentValue) || currentValue < 0)) ||
-        (valuationMethod.value !== "manual" && !bullion)
+        (valuationMethod.value !== "manual" && !bullion) ||
+        !Number.isFinite(taxPaid) ||
+        taxPaid < 0
       )
         return;
       const currencyValue = data.get("currency");
@@ -319,6 +362,7 @@ export function mountInvestments(container: HTMLElement): void {
         category: String(data.get("category")).trim(),
         currency: isCurrency(currencyValue) ? currencyValue : "GBP",
         investedMinor: toMinorUnits(invested),
+        taxMinor: toMinorUnits(taxPaid),
         currentValueMinor:
           bullion || currentValue === null ? null : toMinorUnits(currentValue),
         frequency: String(data.get("frequency")).trim(),

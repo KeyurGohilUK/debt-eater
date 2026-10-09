@@ -289,6 +289,11 @@ dialog::backdrop {
 dialog form {
   padding: 24px;
 }
+#loan-dialog,
+#repayment-dialog {
+  max-height: calc(100dvh - 28px);
+  overflow: auto;
+}
 .dialog-head {
   display: flex;
   align-items: start;
@@ -1049,5 +1054,124 @@ button:focus-visible {
   .simulator-savings,
   .simulator-comparison {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Precious metal portfolio */
+.commodity-page {
+  --commodity-ink: #4b3827;
+  --commodity-gold: #9b702a;
+}
+.commodity-page .investment-heading {
+  align-items: end;
+  padding: 8px 0 18px;
+}
+.commodity-page .eyebrow {
+  color: #97712f;
+}
+.commodity-page .investment-heading h1 {
+  color: var(--commodity-ink);
+}
+.commodity-page .investment-heading .primary {
+  background: #8c6426;
+}
+.commodity-page .metal-price-status {
+  margin: 0 -20px 24px;
+  min-height: 54px;
+  justify-content: center;
+  padding: 12px 20px;
+  color: #573f20;
+  background: #fff0c3;
+  font-size: 13px;
+  font-weight: 650;
+}
+.commodity-page .price-dot {
+  background: #168554;
+}
+.commodity-page .price-dot.loading {
+  background: #ad8b52;
+}
+.commodity-page .metal-price-status.warning .price-dot {
+  background: #c27718;
+}
+.commodity-weights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 16px;
+}
+.commodity-weights article {
+  padding: 18px 20px;
+  border: 1px solid #e6e8eb;
+  border-radius: 16px;
+  background: #fff;
+}
+.commodity-weights span {
+  display: block;
+  color: #8b6a31;
+  font-size: 14px;
+}
+.commodity-weights strong {
+  display: block;
+  margin-top: 6px;
+  color: #4b3827;
+  font-size: 24px;
+}
+.commodity-summary {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+.commodity-summary .investment-total {
+  padding: clamp(20px, 4vw, 34px);
+  border-color: #fff2d1;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #fff8e8, #fff3d8);
+}
+.commodity-summary .investment-total-head span:first-child {
+  color: #8c6426;
+  background: #f8e8bd;
+}
+.commodity-current-label {
+  margin: 18px 0 4px;
+  color: #8c6426;
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+.commodity-current-value {
+  display: block;
+  margin: 0 0 24px;
+  color: #4b3827;
+  font-size: clamp(28px, 5vw, 38px);
+  letter-spacing: -0.04em;
+  text-align: center;
+}
+.commodity-summary .investment-total-row {
+  color: #755c36;
+}
+.commodity-summary .investment-total-row strong {
+  color: #4b3827;
+}
+.commodity-tax-field[hidden] {
+  display: none;
+}
+@media (max-width: 600px) {
+  .commodity-page .investment-heading {
+    align-items: start;
+  }
+  .commodity-page .metal-price-status {
+    margin-right: -14px;
+    margin-left: -14px;
+    justify-content: start;
+    font-size: 11px;
+  }
+  .commodity-weights {
+    gap: 10px;
+  }
+  .commodity-weights article {
+    padding: 15px;
+  }
+  .commodity-weights strong {
+    font-size: 20px;
   }
 }
