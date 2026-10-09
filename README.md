@@ -1,6 +1,6 @@
 # Finance Tracker
 
-Finance Tracker is a fast, visual-first application for personal and business finances. Debt Eater is its debt-management feature; Investments & Savings tracks contributions and manually entered valuations.
+Finance Tracker is a fast, visual-first application for personal and business finances. Debt Eater is its debt-management feature; Investments & Savings tracks contributions, manual valuations and automatic spot-based gold and silver estimates.
 
 The goal is to make a financial position understandable at a glance: what is owed, what has been invested, how balances are changing, and what repayment scenarios may mean.
 
@@ -17,7 +17,7 @@ The goal is to make a financial position understandable at a glance: what is owe
 
 ## Product scope
 
-The app currently includes Debt Eater and an Investments & Savings ledger. Investment contributions and current values are stored separately, totals are grouped by GBP, EUR and INR, and current values are entered manually. See [FEATURES.md](FEATURES.md) for the evolving product roadmap.
+The app currently includes Debt Eater and an Investments & Savings ledger. Investment contributions and current values are stored separately and totals remain grouped by GBP, EUR and INR. Gold and silver holdings can use automatically cached spot prices and daily reference exchange rates; the result is an estimated metal value that excludes premiums, fees, VAT and resale spreads. Other assets continue to use optional manual valuations. See [FEATURES.md](FEATURES.md) for the evolving product roadmap.
 
 ## Engineering
 
