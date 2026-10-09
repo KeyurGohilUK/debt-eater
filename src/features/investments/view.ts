@@ -98,7 +98,7 @@ export function mountInvestments(
           <div><p class="eyebrow">${isCommodities ? "PRECIOUS METALS" : "PORTFOLIO"}</p><h1 id="investments-title">${isCommodities ? "Commodities" : "Investments &amp; savings"}</h1><p class="investment-subtitle">${isCommodities ? "Gold and silver holdings, valued against current spot prices." : "A clear view of what you’ve put aside, across accounts and currencies."}</p></div>
           <button class="primary" id="add-investment">${isCommodities ? "+ Add metal" : "+ Add entry"}</button>
         </div>
-        ${metalPriceStatus()}
+        ${isCommodities ? metalPriceStatus() : ""}
         ${isCommodities ? `<section class="commodity-weights" aria-label="Metal quantities"><article><span>Gold held</span><strong>${formatNumber(weights.goldGrams)} g</strong></article><article><span>Silver held</span><strong>${formatNumber(weights.silverGrams)} g</strong></article></section>` : ""}
         <div class="investment-summary ${isCommodities ? "commodity-summary" : ""}" aria-label="${isCommodities ? "Commodity portfolio totals" : "Investment totals"}">
           ${
@@ -185,6 +185,11 @@ export function mountInvestments(
     const valuationMethod = form.elements.namedItem(
       "valuationMethod",
     ) as HTMLSelectElement;
+    valuationMethod
+      .querySelectorAll<HTMLOptionElement>(
+        'option[value="gold"], option[value="silver"]',
+      )
+      .forEach((option) => (option.disabled = mode !== "commodities"));
     const bullionFields =
       form.querySelector<HTMLFieldSetElement>(".bullion-fields")!;
     const manualValueField = form.querySelector<HTMLElement>(

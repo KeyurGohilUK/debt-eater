@@ -121,6 +121,11 @@ test("records investment entries and keeps currency totals separate", async ({
   await expect(
     page.getByRole("heading", { name: "Investments & savings" }),
   ).toBeVisible();
+  await expect(
+    page.locator(
+      '#investment-form select[name="valuationMethod"] option[value="gold"]',
+    ),
+  ).toBeDisabled();
 
   await page.getByRole("button", { name: "+ Add entry" }).click();
   await page.getByLabel("Account / provider").fill("Trading 212");
