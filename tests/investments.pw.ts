@@ -37,7 +37,7 @@ test("automatically values bullion from spot price and fine weight", async ({
   await page.getByLabel("Tax / GST paid").fill("120");
   await page.getByRole("button", { name: "Save metal" }).click();
 
-  await expect(page.getByText("CURRENT VALUE")).toBeVisible();
+  await expect(page.getByText("CURRENT VALUE", { exact: true })).toBeVisible();
   await expect(page.getByText("£4,499.55").first()).toBeVisible();
   await expect(page.getByText("+£499.55 +12.49%")).toBeVisible();
   await expect(page.getByText("Tax / GST paid").first()).toBeVisible();
