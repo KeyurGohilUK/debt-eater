@@ -32,6 +32,12 @@ const formatGainPercent = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value / 100);
 
+const britanniaImages = {
+  gold: "https://www.royalmint.com/globalassets/_ecommerce/invest/launches/britannia-25/2025-britannia-gold-1oz-reverse-capsule---ukbgb251t-1500x1500-f3a2c67.jpg",
+  silver:
+    "https://www.royalmint.com/globalassets/_ecommerce/invest/launches/britannia-25/1oz-silver/2025-britannia-silver-1oz-reverse-capsule---ukbsb251t-1500x1500-f3a2c67.jpg",
+} as const;
+
 export type PortfolioMode = "investments" | "commodities";
 
 export function mountInvestments(
@@ -64,6 +70,7 @@ export function mountInvestments(
   const investmentCard = (
     entry: InvestmentEntry,
     valuesById: ReadonlyMap<string, number>,
+    isCommodity = false,
   ) => {
     const currentValue = valuesById.get(entry.id) ?? entry.currentValueMinor;
     const valueLabel = entry.bullion ? "Est. metal value" : "Current value";
@@ -74,6 +81,23 @@ export function mountInvestments(
       currentValue === null ? null : currentValue - entry.investedMinor;
     const gainPercent =
       gainMinor === null ? null : (gainMinor / entry.investedMinor) * 100;
+    if (isCommodity && entry.bullion) {
+      const metal = entry.bullion.metal;
+      const coinName = `${metal === "gold" ? "Gold" : "Silver"} Britannia bullion coin`;
+      const weight = `${formatNumber(entry.bullion.quantity * entry.bullion.weightPerItem)} ${entry.bullion.weightUnit === "toz" ? "oz" : "g"}`;
+      return `<article class="investment-card edit-investment commodity-card" data-id="${escapeHtml(entry.id)}" role="button" tabindex="0" aria-label="Edit ${escapeHtml(entry.asset)}">
+        <img class="commodity-coin-image" src="${britanniaImages[metal]}" alt="${coinName}; photo from The Royal Mint" loading="lazy" decoding="async">
+        <div class="commodity-card-main">
+          <div class="commodity-card-meta"><span>${escapeHtml(new Date(`${entry.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}</span><span>${escapeHtml(entry.provider)}</span></div>
+          <div class="investment-card-title"><h3>${escapeHtml(entry.asset)}</h3><span class="investment-category">${metal === "gold" ? "Gold" : "Silver"}</span></div>
+          <div class="commodity-card-detail">${escapeHtml(weight)} · ${entry.bullion.holdingType} · ${formatNumber(entry.bullion.purity)} fine</div>
+        </div>
+        <div class="commodity-card-values">
+          <div class="commodity-card-value"><span>Current value</span><strong>${currentValue === null ? "—" : formatMoney(currentValue, entry.currency)}</strong><small>Invested ${formatMoney(entry.investedMinor, entry.currency)}</small></div>
+          <div class="commodity-card-gain ${gainMinor === null ? "" : gainMinor >= 0 ? "positive" : "negative"}"><span>Gain / loss</span><strong>${gainMinor === null ? "—" : `${gainMinor > 0 ? "+" : ""}${formatMoney(gainMinor, entry.currency)}`}</strong><small>${gainPercent === null ? "" : formatGainPercent(gainPercent)}</small></div>
+        </div>
+      </article>`;
+    }
     return `<article class="investment-card edit-investment" data-id="${escapeHtml(entry.id)}" role="button" tabindex="0" aria-label="Edit ${escapeHtml(entry.asset)}">
       <div class="investment-date">${escapeHtml(new Date(`${entry.date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}</div>
       <div class="investment-card-main"><div class="investment-card-title"><h3>${escapeHtml(entry.asset)}</h3><span class="investment-category">${escapeHtml(entry.category)}</span></div><div class="investment-meta">${escapeHtml(entry.provider)} <span>·</span> ${entry.scope} <span>·</span> ${escapeHtml(entry.frequency)} ${bullionMeta}</div></div>
@@ -130,7 +154,9 @@ export function mountInvestments(
                 ...visibleEntries,
               ]
                 .sort((a, b) => b.date.localeCompare(a.date))
-                .map((entry) => investmentCard(entry, valuesById))
+                .map((entry) =>
+                  investmentCard(entry, valuesById, isCommodities),
+                )
                 .join("")}</div></section>`
             : ""
         }
