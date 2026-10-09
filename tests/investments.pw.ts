@@ -8,7 +8,7 @@ test("date field stays within the investment dialog on mobile", async ({
   await page.getByRole("link", { name: "Investments & savings" }).click();
   await page.getByRole("button", { name: "+ Add entry" }).click();
 
-  const dateInput = page.getByLabel("Date");
+  const dateInput = page.locator('#investment-dialog input[name="date"]');
   const dateBounds = await dateInput.boundingBox();
   const formBounds = await page
     .locator("#investment-dialog form")
