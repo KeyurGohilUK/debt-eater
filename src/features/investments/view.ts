@@ -110,7 +110,7 @@ export function mountInvestments(
             ${isCommodities ? `<div class="commodity-current-label">CURRENT VALUE</div><strong class="commodity-current-value">${summary.valuedEntryCount ? formatMoney(summary.currentValueMinor, summary.currency) : "—"}</strong>` : ""}
             <div class="investment-total-row"><span>Invested</span><strong>${formatMoney(summary.investedMinor, summary.currency)}</strong></div>
             ${isCommodities ? `<div class="investment-total-row"><span>Tax / GST paid</span><strong>${formatMoney(summary.taxMinor, summary.currency)}</strong></div>` : ""}
-            <div class="investment-total-row"><span>Current value <small>(${summary.valuedEntryCount} valued)</small></span><strong>${summary.valuedEntryCount ? formatMoney(summary.currentValueMinor, summary.currency) : "—"}</strong></div>
+            ${!isCommodities ? `<div class="investment-total-row"><span>Current value <small>(${summary.valuedEntryCount} valued)</small></span><strong>${summary.valuedEntryCount ? formatMoney(summary.currentValueMinor, summary.currency) : "—"}</strong></div>` : ""}
             ${summary.valuedEntryCount ? `<div class="investment-change ${summary.gainMinor >= 0 ? "positive" : "negative"}"><span>Change on valued entries</span><strong>${summary.gainMinor > 0 ? "+" : ""}${formatMoney(summary.gainMinor, summary.currency)} <small>${formatGainPercent(summary.gainPercent)}</small></strong></div>` : ""}
           </article>`,
                   )
