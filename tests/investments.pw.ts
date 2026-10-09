@@ -49,7 +49,7 @@ test("automatically values bullion from spot price and fine weight", async ({
   ).toBeVisible();
   await expect(page.getByText("Gold held")).toBeVisible();
   await expect(page.getByText("2 oz", { exact: true })).toBeVisible();
-  await expect(page.getByText(/gold · 2 × 1 toz · 999.9 fine/)).toBeVisible();
+  await expect(page.getByText("2 oz · physical · 999.9 fine")).toBeVisible();
   await expect(
     page.getByRole("img", { name: /Gold Britannia bullion coin/ }),
   ).toHaveAttribute(
