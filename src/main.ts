@@ -103,6 +103,9 @@ function bindBackup() {
   document
     .querySelector(".backup-close")
     ?.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => {
+    passphrase.value = "";
+  });
   document
     .querySelector<HTMLButtonElement>("#backup-save")
     ?.addEventListener("click", async (event) => {
