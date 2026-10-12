@@ -12,6 +12,12 @@ import { mountInvestments } from "./features/investments/view";
 import { summarizeInvestments } from "./domain/investment";
 import { localInvestmentRepository } from "./repositories/investmentRepository";
 import { escapeHtml } from "./shared/html";
+import {
+  createFinanceBackup,
+  decryptFinanceBackup,
+  encryptFinanceBackup,
+} from "./services/financeBackup";
+import { googleDriveBackup } from "./services/googleDriveBackup";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw new Error("Application root not found");
@@ -40,15 +46,17 @@ function tenure(months: number | null): string {
 }
 
 function render() {
-  const header = `<header class="topbar"><div><img class="brand-icon" src="./debt-eater-icon.png" alt="" /><strong>Finance Tracker</strong></div><nav class="module-nav" aria-label="Finance sections"><a href="#/overview" aria-label="Overview" ${activeModule === "overview" ? 'aria-current="page"' : ""}>Overview</a><a href="#/debts" aria-label="Debt Eater" ${activeModule === "debts" ? 'aria-current="page"' : ""}><span class="nav-label-full">Debt Eater</span><span class="nav-label-short">Debt</span></a><a href="#/investments" aria-label="Investments &amp; savings" ${activeModule === "investments" ? 'aria-current="page"' : ""}><span class="nav-label-full">Investments &amp; savings</span><span class="nav-label-short">Investments</span></a><a href="#/commodities" aria-label="Commodities" ${activeModule === "commodities" ? 'aria-current="page"' : ""}>Commodities</a></nav>${activeModule === "debts" ? '<button class="primary" id="add-loan">+ Add debt</button>' : ""}</header>`;
+  const header = `<header class="topbar"><div><img class="brand-icon" src="./debt-eater-icon.png" alt="" /><strong>Finance Tracker</strong></div><nav class="module-nav" aria-label="Finance sections"><a href="#/overview" aria-label="Overview" ${activeModule === "overview" ? 'aria-current="page"' : ""}>Overview</a><a href="#/debts" aria-label="Debt Eater" ${activeModule === "debts" ? 'aria-current="page"' : ""}><span class="nav-label-full">Debt Eater</span><span class="nav-label-short">Debt</span></a><a href="#/investments" aria-label="Investments &amp; savings" ${activeModule === "investments" ? 'aria-current="page"' : ""}><span class="nav-label-full">Investments &amp; savings</span><span class="nav-label-short">Investments</span></a><a href="#/commodities" aria-label="Commodities" ${activeModule === "commodities" ? 'aria-current="page"' : ""}>Commodities</a></nav><button class="secondary backup-open" id="backup-open">Backup</button>${activeModule === "debts" ? '<button class="primary" id="add-loan">+ Add debt</button>' : ""}</header><dialog id="backup-dialog" aria-labelledby="backup-title"><section class="backup-panel"><div class="dialog-head"><div><p class="eyebrow">PRIVATE COPY</p><h2 id="backup-title">Back up your finances</h2></div><button type="button" class="icon backup-close" aria-label="Close">×</button></div><p class="backup-description">Save an encrypted copy of debts, repayments, investments and metal holdings to your Google Drive app folder. The password stays on this device; keep it safe because it cannot be recovered.</p><label>Backup password<input id="backup-passphrase" type="password" minlength="12" autocomplete="new-password" placeholder="At least 12 characters" required></label><div class="backup-actions"><button class="primary full" id="backup-save" ${googleDriveBackup.isConfigured ? "" : "disabled"}>Back up now</button><button class="secondary full" id="backup-restore" ${googleDriveBackup.isConfigured ? "" : "disabled"}>Restore latest backup</button></div><p class="backup-status" id="backup-status" role="status" aria-live="polite">${googleDriveBackup.isConfigured ? "Google Drive stores this encrypted file in its private app-data area." : "Google Drive setup is required before this feature can connect."}</p></section></dialog>`;
   if (activeModule === "overview") {
     app!.innerHTML = `${header}${financeOverview()}`;
+    bindBackup();
     return;
   }
   if (activeModule === "investments" || activeModule === "commodities") {
     app!.innerHTML = `${header}<main id="module-content"></main>`;
     const content = document.querySelector<HTMLElement>("#module-content");
     if (content) mountInvestments(content, activeModule);
+    bindBackup();
     return;
   }
 
@@ -73,6 +81,101 @@ function render() {
     <dialog id="simulator-dialog" aria-labelledby="simulator-title"><section class="simulator-shell"><div class="dialog-head"><div><p class="eyebrow">WHAT IF?</p><h2 id="simulator-title">Repayment simulator</h2><p class="simulator-debt" id="simulator-debt"></p></div><button type="button" class="icon dialog-close" aria-label="Close">×</button></div><form id="simulator-form"><input type="hidden" name="loanId"><label>Extra each month <span id="simulator-currency"></span><input name="monthlyExtra" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label><label>One-off repayment now <span id="simulator-lump-currency"></span><input name="lumpSum" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label><p class="simulator-note">Uses your saved balance, interest rate and direct-debit schedule. Scenario changes are not saved.</p></form><div id="simulator-results" aria-live="polite"></div></section></dialog>
   `;
   bind();
+  bindBackup();
+}
+
+function bindBackup() {
+  const dialog = document.querySelector<HTMLDialogElement>("#backup-dialog");
+  if (!dialog) return;
+  const status = document.querySelector<HTMLElement>("#backup-status")!;
+  const passphrase =
+    document.querySelector<HTMLInputElement>("#backup-passphrase")!;
+  const setBusy = (busy: boolean) => {
+    document
+      .querySelectorAll<HTMLButtonElement>("#backup-save, #backup-restore")
+      .forEach((button) => {
+        button.disabled = busy || !googleDriveBackup.isConfigured;
+      });
+  };
+  document
+    .querySelector("#backup-open")
+    ?.addEventListener("click", () => dialog.showModal());
+  document
+    .querySelector(".backup-close")
+    ?.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => {
+    passphrase.value = "";
+  });
+  document
+    .querySelector<HTMLButtonElement>("#backup-save")
+    ?.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (!passphrase.reportValidity()) return;
+      setBusy(true);
+      status.textContent = "Encrypting and saving to Google Drive…";
+      try {
+        const backup = createFinanceBackup(
+          localLoanRepository.list(),
+          localInvestmentRepository.list(),
+        );
+        const encrypted = await encryptFinanceBackup(backup, passphrase.value);
+        await googleDriveBackup.save(encrypted, backup);
+        status.textContent = `Encrypted backup saved on ${new Date().toLocaleString()}.`;
+      } catch (error) {
+        status.textContent =
+          error instanceof Error
+            ? error.message
+            : "Backup failed. Please try again.";
+      } finally {
+        passphrase.value = "";
+        setBusy(false);
+      }
+    });
+  document
+    .querySelector<HTMLButtonElement>("#backup-restore")
+    ?.addEventListener("click", async (event) => {
+      event.preventDefault();
+      if (!passphrase.reportValidity()) return;
+      if (
+        !window.confirm(
+          "Restore the latest backup? This replaces all debts and investment entries currently stored on this device.",
+        )
+      )
+        return;
+      setBusy(true);
+      status.textContent = "Loading and decrypting the latest backup…";
+      let previousLoans: Loan[] | null = null;
+      let wroteLoans = false;
+      try {
+        const encrypted = await googleDriveBackup.readLatest();
+        const backup = await decryptFinanceBackup(encrypted, passphrase.value);
+        previousLoans = localLoanRepository.list();
+        localLoanRepository.save(backup.loans);
+        wroteLoans = true;
+        localInvestmentRepository.save(backup.investments);
+        status.textContent = "Backup restored. Reloading your finance data…";
+        window.setTimeout(() => window.location.reload(), 500);
+      } catch (error) {
+        if (wroteLoans && previousLoans) {
+          try {
+            localLoanRepository.save(previousLoans);
+          } catch {
+            status.textContent =
+              "Restore could not finish and the previous debt data could not be restored automatically. Do not close this tab; check browser storage before continuing.";
+            passphrase.value = "";
+            setBusy(false);
+            return;
+          }
+        }
+        status.textContent =
+          error instanceof Error
+            ? error.message
+            : "Restore failed. Your current data was not changed.";
+        setBusy(false);
+      } finally {
+        passphrase.value = "";
+      }
+    });
 }
 
 function financeOverview(): string {
