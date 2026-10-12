@@ -104,7 +104,7 @@ async function requestAccessToken(): Promise<string> {
       error_callback: (error) =>
         reject(new Error(error.message ?? "Google sign-in was cancelled.")),
     });
-    tokenClient.requestAccessToken({ prompt: "consent" });
+    tokenClient.requestAccessToken({ prompt: "" });
   });
 }
 
