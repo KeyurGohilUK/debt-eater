@@ -172,6 +172,7 @@ function isLoan(value: unknown): value is Loan {
       (number) => Number.isSafeInteger(number) && (number as number) >= 0,
     ) &&
     typeof loan.nextPaymentDate === "string" &&
+    !Number.isNaN(Date.parse(loan.nextPaymentDate)) &&
     Array.isArray(loan.directRepayments) &&
     loan.directRepayments.every(
       (repayment) =>
@@ -179,7 +180,8 @@ function isLoan(value: unknown): value is Loan {
         typeof repayment.id === "string" &&
         Number.isSafeInteger(repayment.amountMinor) &&
         repayment.amountMinor > 0 &&
-        typeof repayment.date === "string",
+        typeof repayment.date === "string" &&
+        !Number.isNaN(Date.parse(repayment.date)),
     )
   );
 }
